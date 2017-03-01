@@ -85,14 +85,15 @@ void ThreadPool::MyThreadRoutine(int myID) {
         this->bufferValide = false;
         printf("Thread %d récupère l'item %d !\n", myID, temp);
         printf("Thread %d va dormir %d sec.\n", myID, temp);
-
+        pthread_cond_signal(&this->CondProducteur);
         pthread_mutex_unlock(&this->mutex);
         sleep(temp);
-        pthread_cond_signal(&this->CondProducteur);
+
     }
     printf("############ Thread %d termine!###########\n", myID);
-    this->nThreadActive = this->nThreadActive - 1;
+    this->nThreadActive--;
     pthread_exit(0);
+
 }
 
 /* void ThreadPool::Inserer(unsigned int newItem)
@@ -121,10 +122,10 @@ void ThreadPool::Quitter() {
 	// À compléter
     this->PoolDoitTerminer = true;
     pthread_cond_broadcast(&this->CondProducteur);
-    while(this->nThreadActive - 1 >= 0){
+    pthread_cond_broadcast(&this->CondThreadRienAFaire);
+    for(int i= this->nThreadActive - 1; i >= 0; i--){
         //pthread_cond_broadcast(&this->CondThreadRienAFaire);
-        pthread_cond_wait(&this->CondThreadRienAFaire, &this->mutex);
-        pthread_join(pTableauThread[this->nThreadActive - 1], 0);
+        pthread_join(pTableauThread[i], 0);
     }
 }
 
