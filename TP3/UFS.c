@@ -97,7 +97,15 @@ void printiNode(iNodeEntry iNode) {
 					 
 
 int bd_countfreeblocks(void) {
-	return 0;
+  int freeblocks =0;
+  for (int i=0; i<N_BLOCK_ON_DISK; i++){
+    char pBuffer[BLOCK_SIZE];
+    ReadBlock(i, pBuffer);
+    if(pBuffer[0] == '\0'){
+      freeblocks++;
+    }
+  }
+  return freeblocks;
 }
 
 int bd_stat(const char *pFilename, gstat *pStat) {
