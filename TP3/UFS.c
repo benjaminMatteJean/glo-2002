@@ -98,10 +98,10 @@ void printiNode(iNodeEntry iNode) {
 
 int bd_countfreeblocks(void) {
   int freeblocks =0;
+  char data[BLOCK_SIZE];
+  ReadBlock(FREE_BLOCK_BITMAP, data);
   for (int i=0; i<N_BLOCK_ON_DISK; i++){
-    char pBuffer[BLOCK_SIZE];
-    ReadBlock(i, pBuffer);
-    if(pBuffer[0] == '\0'){
+    if(data[i] != 0){
       freeblocks++;
     }
   }
@@ -113,6 +113,20 @@ int bd_stat(const char *pFilename, gstat *pStat) {
 }
 
 int bd_create(const char *pFilename) {
+	char data[BLOCK_SIZE];
+	ReadBlock(FREE_INODE_BITMAP, data);
+	char inodes1[BLOCK_SIZE];
+	ReadBlock(4, inodes1);
+	char inodes2[BLOCK_SIZE];
+	ReadBlock(5, inodes2);
+	for(int i=0; i < N_INODE_ON_DISK; i++) {
+		if( i <= 15 && data[i] == 0){
+			for(int j = i*NUM_INODE_PER_BLOCK; j < ((i+1)*NUM_INODE_PER_BLOCK) -1; j++) {
+				
+				//TODO: Faire un iNodeEntry avec les 16 bits de l`intervalle calcule 
+	}
+	}
+	}	
 	return -1;
 }
 
