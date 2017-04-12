@@ -92,7 +92,7 @@ void printiNode(iNodeEntry iNode) {
 
 
 /* ----------------------------------------------------------------------------------------
-					            à vous de jouer, maintenant!
+				  à vous de jouer, maintenant!
    ---------------------------------------------------------------------------------------- */
 
 //Auxiliaires
@@ -166,10 +166,10 @@ int getInodeFromPath(const char *pPath){
 
 int bd_countfreeblocks(void) {
   int freeblocks =0;
-  char data[BLOCK_SIZE];
-  ReadBlock(FREE_BLOCK_BITMAP, data);
   for (int i=0; i<N_BLOCK_ON_DISK; i++){
-    if(data[i] != 0){
+    char pBuffer[BLOCK_SIZE];
+    ReadBlock(i, pBuffer);
+    if(pBuffer[0] == '\0'){
       freeblocks++;
     }
   }
@@ -177,7 +177,10 @@ int bd_countfreeblocks(void) {
 }
 
 int bd_stat(const char *pFilename, gstat *pStat) {
-	return -1;
+  gstat temp;
+  iNodeEntry node;
+  getiNodeFromFilename(pFilename, node);
+  return -1;
 }
 
 int bd_create(const char *pFilename) {
@@ -192,7 +195,6 @@ int bd_create(const char *pFilename) {
 //Si ça passe, prendre un bloque libre + mettre le bitmap a jour (Une future auxiliaire à codé)
 //Créer un iNodeEntry avec le nouveau fichier et le bloque, l'écrire sur le disque.
 //Mettre à jour le iNodeEntry du directrory, en y ajoutant le DirEntry du fichier sur celui-ci. (Un autre auxiliaire à codé...)
-
 }
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
@@ -237,5 +239,24 @@ int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
 
 int bd_readlink(const char *pPathLien, char *pBuffer, int sizeBuffer) {
     return -1;
+}
+
+/* ------------------------------------------------------------------------------------------
+					Fonctions utilitaires
+   ------------------------------------------------------------------------------------------ */
+
+/**
+ * Permet d'écrire dans iNode le inode associé 
+ */
+int getiNodeFromFilename(const char *pPath, iNodeEntry *iNode) {
+  char filename;
+  GetFilenameFromPath(pPath, filename);
+  for (int i = 4; i < 6; i++) {
+    for (int j = 0; j < NUM_INODE_PER_BLOCK; j++) {
+      char data[BLOCK_SIZE];
+      ReadBlock(i, data);
+      //TODO: Caster les données du bloc en iNodes. Comparer les noms de fichiers et directories.
+    }
+  }
 }
 
