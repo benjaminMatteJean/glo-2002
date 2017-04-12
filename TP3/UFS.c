@@ -94,7 +94,75 @@ void printiNode(iNodeEntry iNode) {
 /* ----------------------------------------------------------------------------------------
 					            à vous de jouer, maintenant!
    ---------------------------------------------------------------------------------------- */
-					 
+
+//Auxiliaires
+
+/*Retourne le numéro d'Inode d'un pFilename dans le répertoire spécifier par parentIno.*/
+int getInodeFromParent(const char *pFilename, int parentIno) {
+  if(strcmp(pFilename, "") == 0)
+    return parentIno;
+  char data[BLOCK_SIZE];
+  
+  int inoBNum = BASE_BLOCK_INODE;
+  if((parentIno / NUM_INODE_PER_BLOCK) >= 1)
+    inoBNum++;
+
+  ReadBlock(inoBNum, data);
+  iNodeEntry *pINodes = (iNodeEntry *) data;
+  //Position de l'inode du parent.
+  UINT16 inoPos = parentIno % NUM_INODE_PER_BLOCK;
+  //Nombre d'entrées dans le répertoire parent.
+  UINT16 nEntries = NumberofDirEntry(pINodes[inoPos].iNodeStat.st_size);
+
+  ReadBlock(pINodes[inoPos].Block[0], data);
+  DirEntry *pDE = (DirEntry *) data;
+
+  size_t n;
+  for(n=0; n < nEntries; n++) {
+    if (strcmp(pFilename, pDE[n].Filename) == 0)
+      return pDE[n].iNode;
+  }
+  return -1; //Si le nom de fichier n'existe pas...
+}
+
+/*Retourne le numéro d'Inode de pFilename par récursion.*/
+int getInode(const char *pPath, const char *pFilename, int parentIno) {
+  if (parentIno == -1)
+    return -1;
+
+  char pName[FILENAME_SIZE];
+  int iChar, iSlash=0;
+  for (iChar =0; iChar < FILENAME_SIZE; iChar++) {
+    if (pPath[iChar] == 0)
+      break;
+    else if (pPath[iChar] == "/" && iChar != 0)
+      break;
+    else if (pPath[iChar] == "/")
+      iSlash++;
+    else {
+      pName[iChar-iSlash] = pPath[iChar];
+    }
+  }
+  pName[iChar - iSlash] = 0;
+  if (strcmp(pFilename, pName) == 0){
+    return getInodeFromParent(pName, parentIno);
+  }
+  else {
+    getInode(pPath + strlen(pName) + 1, pFilename, getInodeFromParent(pName, parentIno));
+  } 
+}
+
+/*Retourne le numéro d'inode spécifié par le chemin pPath.*/
+int getInodeFromPath(const char *pPath){
+  if(strcmp(pPath, "/") == 0)
+    return ROOT_INODE;
+  char pName[FILENAME_SIZE];
+  if(GetFilenameFromPath(pPath, pName) == 0)
+    pName[0] = 0;
+  return getInode(pPath, pName, ROOT_INODE);
+}
+
+
 
 int bd_countfreeblocks(void) {
   int freeblocks =0;
@@ -113,21 +181,18 @@ int bd_stat(const char *pFilename, gstat *pStat) {
 }
 
 int bd_create(const char *pFilename) {
-	char data[BLOCK_SIZE];
-	ReadBlock(FREE_INODE_BITMAP, data);
-	char inodes1[BLOCK_SIZE];
-	ReadBlock(4, inodes1);
-	char inodes2[BLOCK_SIZE];
-	ReadBlock(5, inodes2);
-	for(int i=0; i < N_INODE_ON_DISK; i++) {
-		if( i <= 15 && data[i] == 0){
-			for(int j = i*NUM_INODE_PER_BLOCK; j < ((i+1)*NUM_INODE_PER_BLOCK) -1; j++) {
-				
-				//TODO: Faire un iNodeEntry avec les 16 bits de l`intervalle calcule 
-	}
-	}
-	}	
-	return -1;
+  char strDir[BLOCK_SIZE];
+  char strFile[FILENAME_SIZE];
+  ino dirInode, fileInode = 0;
+
+  GetDirFromPath(pFilename, strDir);
+  GetFilenameFromPath(pFilename, strFile);
+
+//TODO : Vérifier que le repertoire existe et que le fichier existe avec les Auxiliaires codés.
+//Si ça passe, prendre un bloque libre + mettre le bitmap a jour (Une future auxiliaire à codé)
+//Créer un iNodeEntry avec le nouveau fichier et le bloque, l'écrire sur le disque.
+//Mettre à jour le iNodeEntry du directrory, en y ajoutant le DirEntry du fichier sur celui-ci. (Un autre auxiliaire à codé...)
+
 }
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
