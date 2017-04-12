@@ -165,11 +165,11 @@ int getInodeFromPath(const char *pPath){
 
 
 int bd_countfreeblocks(void) {
-  int freeblocks =0;
-  for (int i=0; i<N_BLOCK_ON_DISK; i++){
-    char pBuffer[BLOCK_SIZE];
-    ReadBlock(i, pBuffer);
-    if(pBuffer[0] == '\0'){
+   int freeblocks =0;
+   char data[BLOCK_SIZE];
+   ReadBlock(FREE_BLOCK_BITMAP, data);
+   for (int i=0; i<N_BLOCK_ON_DISK; i++){
+    if(data[i] != 0){
       freeblocks++;
     }
   }
