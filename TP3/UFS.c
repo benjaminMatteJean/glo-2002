@@ -278,10 +278,17 @@ int bd_countfreeblocks(void) {
 }
 
 int bd_stat(const char *pFilename, gstat *pStat) {
-  gstat temp;
-  iNodeEntry node;
-  getiNodeFromFilename(pFilename, node);
-  return -1;
+  ino fileInode = getInodeFromPath(pFilename);
+  if (fileInode == -1) {
+    return -1; //N'existe pas.
+  }
+
+  iNodeEntry pInodeFile;
+  if(getInodeEntry(fileInode, &pInodeFile) != 0) {
+    return -1;
+  }
+  *pStat = pInodeFile.iNodeStat;
+  return 0; //Succès.
 }
 
 int bd_create(const char *pFilename) {
@@ -294,12 +301,12 @@ int bd_create(const char *pFilename) {
 
   dirInode = getInodeFromPath(strDir);
   if(dirInode  == -1) {
-    return -1; //Le directory n'existe pas
+    return -1; //Le directory n'existe pas.
   }
 
   fileInode = getInodeFromPath(strFile);
   if(fileInode != -1) {
-    return -2; //Le fichier existe déjà
+    return -2; //Le fichier existe déjà.
   }
 
   fileInode = takeFreeInode();
@@ -363,23 +370,3 @@ int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
 int bd_readlink(const char *pPathLien, char *pBuffer, int sizeBuffer) {
     return -1;
 }
-
-/* ------------------------------------------------------------------------------------------
-					Fonctions utilitaires
-   ------------------------------------------------------------------------------------------ */
-
-/**
- * Permet d'écrire dans iNode le inode associé 
- */
-int getiNodeFromFilename(const char *pPath, iNodeEntry *iNode) {
-  char filename;
-  GetFilenameFromPath(pPath, filename);
-  for (int i = 4; i < 6; i++) {
-    for (int j = 0; j < NUM_INODE_PER_BLOCK; j++) {
-      char data[BLOCK_SIZE];
-      ReadBlock(i, data);
-      //TODO: Caster les données du bloc en iNodes. Comparer les noms de fichiers et directories.
-    }
-  }
-}
-
