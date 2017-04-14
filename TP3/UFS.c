@@ -166,7 +166,7 @@ int getInodeFromPath(const char *pPath){
 int takeFreeBlock() {
   char data[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, data);
-  int numBlock=0;
+  int numBlock=ROOT_INODE;
   
   while(data[numBlock] == 0 && numBlock > N_BLOCK_ON_DISK) {
     numBlock++;
@@ -189,6 +189,25 @@ int ReleaseFreeBlock(UINT16 BlockNum) {
   printf("GLOFS: Relache bloc %d\n",BlockNum);
   WriteBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
   return 1;
+}
+
+/*Retourne le numéro d'un inode libre.*/
+int takeFreeInode(){
+  char data[BLOCK_SIZE];
+  ReadBlock(FREE_INODE_BITMAP, data);
+  int numInode=ROOT_INODE;
+  
+  while(data[numInode] == 0 && numInode > N_INODE_ON_DISK) {
+    numInode++;
+  }
+  if(numInode >= N_BLOCK_ON_DISK) {
+    return -1;
+  }
+
+  data[numInode] = 0;
+  printf("GLOFS: Saisie de l'i-node %d\n",numInode);
+  WriteBlock(FREE_BLOCK_BITMAP, data);
+  return numInode;
 }
 
 /*Retourne le iNodeEntry correspondant au numéro d'inode valide donné. -1 sinon.*/
@@ -224,6 +243,25 @@ void writeInode(iNodeEntry *pIE) {
   WriteBlock(inoBNum, data);
 }
 
+/*Ajoute le directory d'un filename dans un directory existant.*/
+void addFileDirInDir(iNodeEntry * destDir, ino fileIno, char * filename) {
+  DirEntry *pDirEntry;
+  char data[BLOCK_SIZE];
+
+  destDir->iNodeStat.st_size += sizeof(DirEntry);
+  writeInode(destDir);
+
+  int nEntries = NumberofDirEntry(destDir->iNodeStat.st_size);
+  UINT16 blNum = destDir->Block[0];
+  ReadBlock(blNum, data);
+  pDirEntry = (DirEntry *) data;
+
+  pDirEntry += nEntries -1; //Sa place dans le bloque.
+  pDirEntry->iNode = fileIno;
+  strcpy(pDirEntry->Filename, filename);
+  WriteBlock(blNum, data);
+}
+
 /*Fin */
 
 
@@ -256,15 +294,15 @@ int bd_create(const char *pFilename) {
 
   dirInode = getInodeFromPath(strDir);
   if(dirInode  == -1) {
-    return -1;
+    return -1; //Le directory n'existe pas
   }
 
   fileInode = getInodeFromPath(strFile);
   if(fileInode != -1) {
-    return -2;
+    return -2; //Le fichier existe déjà
   }
 
-  fileInode = takeFreeBlock();
+  fileInode = takeFreeInode();
   iNodeEntry pInodeFile;
   getInodeEntry(fileInode,&pInodeFile);
   pInodeFile.iNodeStat.st_ino = fileInode;
@@ -272,16 +310,14 @@ int bd_create(const char *pFilename) {
   pInodeFile.iNodeStat.st_nlink = 1;
   pInodeFile.iNodeStat.st_size =0;
   pInodeFile.iNodeStat.st_blocks = 0;
-  pInodeFile.iNodeStat.st_mode | G_IRWXU | G_IRWXG;
+  pInodeFile.iNodeStat.st_mode |=G_IRWXU | G_IRWXG;
   writeInode(&pInodeFile);
 
   iNodeEntry pInodeDir;
   getInodeEntry(dirInode, &pInodeDir);
+  addFileDirInDir(&pInodeFile, fileInode, pFilename);
   
-//TODO
-//Mettre à jour le iNodeEntry du directrory, en y ajoutant le DirEntry du fichier sur celui-ci. (Un autre auxiliaire à codé...)
-  
-  return 0;
+  return 0; //ça passe
 }
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
