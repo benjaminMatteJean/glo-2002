@@ -162,6 +162,69 @@ int getInodeFromPath(const char *pPath){
   return getInode(pPath, pName, ROOT_INODE);
 }
 
+/*Retourne le numéro d'un bloque libre, -1 sinon. */
+int takeFreeBlock() {
+  char data[BLOCK_SIZE];
+  ReadBlock(FREE_BLOCK_BITMAP, data);
+  int numBlock=0;
+  
+  while(data[numBlock] == 0 && numBlock > N_BLOCK_ON_DISK) {
+    numBlock++;
+  }
+  if(numBlock >= N_BLOCK_ON_DISK) {
+    return -1;
+  }
+
+  data[numBlock] = 0;
+  printf("GLOFS: Saisie bloc %d\n",numBlock);
+  WriteBlock(FREE_BLOCK_BITMAP, data);
+  return numBlock;
+}
+
+/*Rend le bloque BlockNum libre sur le bitmap*/
+int ReleaseFreeBlock(UINT16 BlockNum) {
+  char BlockFreeBitmap[BLOCK_SIZE];
+  ReadBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
+  BlockFreeBitmap[BlockNum] = 1;
+  printf("GLOFS: Relache bloc %d\n",BlockNum);
+  WriteBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
+  return 1;
+}
+
+/*Retourne le iNodeEntry correspondant au numéro d'inode valide donné. -1 sinon.*/
+int getInodeEntry(int ino, iNodeEntry *pIE) {
+  if(ino > N_BLOCK_ON_DISK || ino < 0) {
+    return -1;
+  }
+  char data[BLOCK_SIZE];
+  int inoNum = ino;
+  int inoBNum = BASE_BLOCK_INODE;
+  if((inoNum / NUM_INODE_PER_BLOCK) >= 1)
+    inoBNum++;
+
+  ReadBlock(inoBNum, data);
+  iNodeEntry *pINodes = (iNodeEntry *) data;
+  //Position de l'inode du parent.
+  UINT16 inoPos = inoNum % NUM_INODE_PER_BLOCK;
+  *pIE = pINodes[inoPos];
+  return 0;
+}
+
+/*Écris le inode passé en paramètre sur le disque */
+void writeInode(iNodeEntry *pIE) {
+  char data[BLOCK_SIZE];
+  int inoBNum = BASE_BLOCK_INODE;
+  if((pIE->iNodeStat.st_ino / NUM_INODE_PER_BLOCK) >= 1)
+    inoBNum++;
+
+  ReadBlock(inoBNum, data);
+  iNodeEntry *pINodes = (iNodeEntry *) data;
+  UINT16 inoPos = pIE->iNodeStat.st_ino % NUM_INODE_PER_BLOCK;
+  pINodes[inoPos] = *pIE;
+  WriteBlock(inoBNum, data);
+}
+
+/*Fin */
 
 
 int bd_countfreeblocks(void) {
@@ -191,10 +254,34 @@ int bd_create(const char *pFilename) {
   GetDirFromPath(pFilename, strDir);
   GetFilenameFromPath(pFilename, strFile);
 
-//TODO : Vérifier que le repertoire existe et que le fichier existe avec les Auxiliaires codés.
-//Si ça passe, prendre un bloque libre + mettre le bitmap a jour (Une future auxiliaire à codé)
-//Créer un iNodeEntry avec le nouveau fichier et le bloque, l'écrire sur le disque.
+  dirInode = getInodeFromPath(strDir);
+  if(dirInode  == -1) {
+    return -1;
+  }
+
+  fileInode = getInodeFromPath(strFile);
+  if(fileInode != -1) {
+    return -2;
+  }
+
+  fileInode = takeFreeBlock();
+  iNodeEntry pInodeFile;
+  getInodeEntry(fileInode,&pInodeFile);
+  pInodeFile.iNodeStat.st_ino = fileInode;
+  pInodeFile.iNodeStat.st_mode = G_IFREG;
+  pInodeFile.iNodeStat.st_nlink = 1;
+  pInodeFile.iNodeStat.st_size =0;
+  pInodeFile.iNodeStat.st_blocks = 0;
+  pInodeFile.iNodeStat.st_mode | G_IRWXU | G_IRWXG;
+  writeInode(&pInodeFile);
+
+  iNodeEntry pInodeDir;
+  getInodeEntry(dirInode, &pInodeDir);
+  
+//TODO
 //Mettre à jour le iNodeEntry du directrory, en y ajoutant le DirEntry du fichier sur celui-ci. (Un autre auxiliaire à codé...)
+  
+  return 0;
 }
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
