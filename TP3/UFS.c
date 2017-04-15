@@ -167,9 +167,9 @@ int getInodeFromPath(const char *pPath){
 int takeFreeBlock() {
   char data[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, data);
-  int numBlock=ROOT_INODE;
+  int numBlock=BASE_BLOCK_INODE + (N_INODE_ON_DISK / NUM_INODE_PER_BLOCK);
   
-  while(data[numBlock] == 0 && numBlock > N_BLOCK_ON_DISK) {
+  while(data[numBlock] == 0 && numBlock < N_BLOCK_ON_DISK) {
     numBlock++;
   }
   if(numBlock >= N_BLOCK_ON_DISK) {
@@ -216,7 +216,7 @@ int releaseFreeInode(int inoNum) {
   char data[BLOCK_SIZE];
   ReadBlock(FREE_INODE_BITMAP, data);
   data[inoNum] = 1;
-  printf("GLOFS: relache l'inode %d", inoNum);
+  printf("GLOFS: relache l'inode %d\n", inoNum);
   WriteBlock(FREE_INODE_BITMAP, data);
   return 1;
 }
@@ -276,7 +276,6 @@ void addFileDirInDir(iNodeEntry * destDir, ino fileIno, char * filename) {
 /*Enlève du dirEntry le directory spécifié par le numIno*/
 void removeDir(iNodeEntry * iNodeDirectory, ino numIno) {
   char data[BLOCK_SIZE];
-  
   int size  = iNodeDirectory->iNodeStat.st_size;
   iNodeDirectory->iNodeStat.st_size -= BLOCK_SIZE / sizeof(DirEntry);
   writeInode(iNodeDirectory);
@@ -292,6 +291,7 @@ void removeDir(iNodeEntry * iNodeDirectory, ino numIno) {
     if(found == 1) {
       pDir[i] = pDir[i+1];
     }
+    i++;
   }
   WriteBlock(blNum, data);
 }
@@ -521,9 +521,10 @@ int bd_truncate(const char *pFilename, int NewSize) {
 }
 
 int bd_rmdir(const char *pFilename) {
-  char strSubDir[FILENAME_SIZE];
+  char strSubDir[BLOCK_SIZE];
   char strFilename[FILENAME_SIZE];
   ino subDirIno, dirNameIno;
+  
   if(GetDirFromPath(pFilename, strSubDir) == 0) {
     return -1; //pDirName ne contient aucun /.
   }
@@ -542,15 +543,16 @@ int bd_rmdir(const char *pFilename) {
   if(getInodeEntry(dirNameIno,&pInodeDir) == -1) {
     return -1; 
   }
-  if(NumberofDirEntry(pInodeDir.iNodeStat.st_size) != 2) {
-    return -3; //Pas vide.
-  }
-  printf("removeDir");
   if(pInodeDir.iNodeStat.st_mode & G_IFREG) {
     return -2; //Fichier régulier.
   }
+  UINT16 nentries = NumberofDirEntry(pInodeDir.iNodeStat.st_size);
+  if(nentries  > 2){
+    return -3; //Pas vide.
+  }
   removeDir(&pInodeSubDir, dirNameIno);
   pInodeSubDir.iNodeStat.st_nlink--;
+  writeInode(&pInodeSubDir);
   releaseFreeBlock(pInodeDir.Block[0]);
   releaseFreeInode(dirNameIno);
   return 0;
