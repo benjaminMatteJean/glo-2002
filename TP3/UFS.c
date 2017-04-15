@@ -490,16 +490,16 @@ int bd_rmdir(const char *pFilename) {
   if(getInodeEntry(subDirIno,&pInodeSubDir) == -1){
     return -1; //Invalide iNodeEntry
   }
-  if(getInodeEntry(subDirIno,&pInodeSubDir) == -1) {
+  if(getInodeEntry(dirNameIno,&pInodeDir) == -1) {
     return -1; 
   }
-  if(NumberofDirEntry(pInodeDir.iNodeStat.st_size) > 2) {
+  if(NumberofDirEntry(pInodeDir.iNodeStat.st_size) != 2) {
     return -3; //Pas vide.
   }
+  printf("removeDir");
   if(pInodeDir.iNodeStat.st_mode & G_IFREG) {
     return -2; //Fichier régulier.
   }
-  
   removeDir(&pInodeSubDir, dirNameIno);
   pInodeSubDir.iNodeStat.st_nlink--;
   releaseFreeBlock(pInodeDir.Block[0]);
