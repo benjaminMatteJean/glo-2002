@@ -328,12 +328,12 @@ int bd_create(const char *pFilename) {
 }
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
-  ino inodeNumber = getInodeFromPath(pFilename);
-  if (inodeNumber == -1)
+  ino iNodeNumber = getInodeFromPath(pFilename);
+  if (iNodeNumber == -1)
     return -1; //Le fichier n'existe pas.
 
   iNodeEntry fileiNode;
-  getInodeEntry(inodeNumber, &fileiNode);
+  getInodeEntry(iNodeNumber, &fileiNode);
 
   if (fileiNode.iNodeStat.st_mode & G_IFDIR)
     return -2; //Ce n'est pas un fichier, mais un répertoire.
@@ -385,7 +385,23 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 }
 
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
-	return -1;
+  ino iNodeNumber = getInodeFromPath(pDirLocation);
+  if (iNodeNumber == -1)
+    return -1; //Directory inexistant.
+
+  iNodeEntry diriNode;
+  getInodeEntry(iNodeNumber, &diriNode);
+  if (!diriNode.iNodeStat.st_mode & G_IFDIR)
+    return -1; // Le fichier spécifié n'est pas un directory.
+  
+  char dirEntries[BLOCK_SIZE];
+  ReadBlock(diriNode.Block[0], dirEntries)
+  for (int i = 0; i < diriNode.iNodeStat.st_size; i++)
+  {
+    
+  }
+
+  return 0;
 }
 
 int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
