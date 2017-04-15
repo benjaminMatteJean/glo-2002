@@ -477,21 +477,20 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 	if ((offset + numbytes) >= BLOCK_SIZE*N_BLOCK_PER_INODE)
 		numbytes = (BLOCK_SIZE*N_BLOCK_PER_INODE - offset);
 
-	// Si le nombre de bytes à écrire est supérieur à ceux dans buffer, on le réduit au nombre dans buffer.
-	if (numbytes > strlen(buffer))
-		numbytes = strlen(buffer);
+	// Si le fichier ne contient aucune donnée, on crée un nouveau bloc.
+	if (fileSize == 0 && fileiNode.iNodeStat.st_blocks == 0) {
+		int newBlock = takeFreeBlock();
+		if (newBlock == -1)
+			return 0; // Aucun bloc libre disponible.
+		fileiNode.Block[0] = newBlock;
+		fileiNode.iNodeStat.st_blocks = 1;
+	}
 
-	printf("numbytes avant write: %i \n", numbytes);
-	printf("offset: %i \n", offset);
-
-	// Les lignes suivantes écrivent les données dans le fichier, aux endroits assignés.
+	// Le bloc de données est récupéré, modifié puis réécrit.
 	char fileData[BLOCK_SIZE];
   ReadBlock(fileiNode.Block[0], fileData);
-	printf("Lecture du bloc #%i \n", fileiNode.Block[0]);
-	printf("Donnees du bloc avant ecriture: %s \n", fileData);
 	for (int i = offset; i < (offset + numbytes); i++)
-    fileData[i] = buffer[i];
-	printf("Donnees du bloc apres ecriture: %s \n", fileData);
+    fileData[i] = buffer[i-offset];
 	WriteBlock(fileiNode.Block[0], fileData);
 
 	// Les lignes suivantes déterminent la nouvelle taille du fichier.
