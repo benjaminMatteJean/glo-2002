@@ -97,7 +97,7 @@ void printiNode(iNodeEntry iNode) {
 
 //Auxiliaires
 
-/*Retourne le numéro d'Inode d'un pFilename dans le répertoire spécifier par parentIno.*/
+/*Retourne le numéro d'Inode d'un pFilename dans le répertoire spécifié par parentIno.*/
 int getInodeFromParent(const char *pFilename, int parentIno) {
   if(strcmp(pFilename, "") == 0)
     return parentIno;
@@ -162,7 +162,7 @@ int getInodeFromPath(const char *pPath){
   return getInode(pPath, pName, ROOT_INODE);
 }
 
-/*Retourne le numéro d'un bloque libre, -1 sinon. */
+/*Retourne le numéro d'un bloc libre, -1 sinon. */
 int takeFreeBlock() {
   char data[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, data);
@@ -181,7 +181,7 @@ int takeFreeBlock() {
   return numBlock;
 }
 
-/*Rend le bloque BlockNum libre sur le bitmap*/
+/*Rend le bloc BlockNum libre sur le bitmap*/
 int ReleaseFreeBlock(UINT16 BlockNum) {
   char BlockFreeBitmap[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
@@ -256,7 +256,7 @@ void addFileDirInDir(iNodeEntry * destDir, ino fileIno, char * filename) {
   ReadBlock(blNum, data);
   pDirEntry = (DirEntry *) data;
 
-  pDirEntry += nEntries -1; //Sa place dans le bloque.
+  pDirEntry += nEntries -1; //Sa place dans le bloc.
   pDirEntry->iNode = fileIno;
   strcpy(pDirEntry->Filename, filename);
   WriteBlock(blNum, data);
@@ -328,7 +328,32 @@ int bd_create(const char *pFilename) {
 }
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
-	return -1;
+  ino inodeNumber = getInodeFromPath(pFilename);
+  if (inodeNumber == -1)
+    return -1; //Le fichier n'existe pas.
+
+  iNodeEntry fileiNode;
+  getInodeEntry(inodeNumber, &fileiNode);
+
+  if (fileiNode.iNodeStat.st_mode & G_IFDIR)
+    return -2; //Ce n'est pas un fichier, mais un répertoire.
+  
+  int fileSize = fileiNode.iNodeStat.st_size;
+  if(offset >= fileSize)
+    return 0; //Incapable de lire, car position de départ plus élevée que la taille du fichier.
+
+  /*Ici, on ajuste la taille du fichier à lire. C'est-à-dire, si offset+numbytes est plus grand
+    que la taille du fichier, on réduit numbytes pour que offset+numbytes == fileSize.*/
+  if ((offset + numbytes) > fileSize)
+    numbytes = fileSize - offset;
+
+  char fileData[BLOCK_SIZE];
+  ReadBlock(fileiNode.Block[0], fileData);
+  for (int i = offset; i < (offset + numbytes); i++)
+  {
+    buffer[i] = fileData[i];
+  }
+  return numbytes;
 }
 
 int bd_mkdir(const char *pDirName) {
