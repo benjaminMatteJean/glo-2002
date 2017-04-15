@@ -183,7 +183,7 @@ int takeFreeBlock() {
 }
 
 /*Rend le bloc BlockNum libre sur le bitmap*/
-int ReleaseFreeBlock(UINT16 BlockNum) {
+int releaseFreeBlock(UINT16 BlockNum) {
   char BlockFreeBitmap[BLOCK_SIZE];
   ReadBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
   BlockFreeBitmap[BlockNum] = 1;
@@ -209,6 +209,16 @@ int takeFreeInode(){
   printf("GLOFS: Saisie de l'i-node %d\n",numInode);
   WriteBlock(FREE_BLOCK_BITMAP, data);
   return numInode;
+}
+
+/*Relache l'inode passé en paramètre*/
+int releaseFreeInode(int inoNum) {
+  char data[BLOCK_SIZE];
+  ReadBlock(FREE_INODE_BITMAP, data);
+  data[inoNum] = 1;
+  printf("GLOFS: relache l'inode %d", inoNum);
+  WriteBlock(FREE_INODE_BITMAP, data);
+  return 1;
 }
 
 /*Retourne le iNodeEntry correspondant au numéro d'inode valide donné. -1 sinon.*/
@@ -260,6 +270,29 @@ void addFileDirInDir(iNodeEntry * destDir, ino fileIno, char * filename) {
   pDirEntry += (nEntries -1); //Sa place dans le bloc.
   pDirEntry->iNode = fileIno;
   strcpy(pDirEntry->Filename, filename);
+  WriteBlock(blNum, data);
+}
+
+/*Enlève du dirEntry le directory spécifié par le numIno*/
+void removeDir(iNodeEntry * iNodeDirectory, ino numIno) {
+  char data[BLOCK_SIZE];
+  
+  int size  = iNodeDirectory->iNodeStat.st_size;
+  iNodeDirectory->iNodeStat.st_size -= BLOCK_SIZE / sizeof(DirEntry);
+  writeInode(iNodeDirectory);
+  UINT16 blNum = iNodeDirectory->Block[0];
+  ReadBlock(blNum, data);
+  DirEntry * pDir = (DirEntry *) data;
+
+  int i=0, count = NumberofDirEntry(size), found = 0;
+  while(i < count) {
+    if(pDir[i].iNode == numIno){
+      found = 1;
+    }
+    if(found == 1) {
+      pDir[i] = pDir[i+1];
+    }
+  }
   WriteBlock(blNum, data);
 }
 
@@ -398,7 +431,7 @@ int bd_mkdir(const char *pDirName) {
 
   //incrémente le nb de liens + écrit sur disque et ajoute un directory dans le directory parent.
   pInodeSubDir.iNodeStat.st_nlink++;
-  writeInode(&subDirIno);
+  writeInode(&pInodeSubDir);
   addFileDirInDir(&pInodeSubDir, dirNameIno, strFilename);
   //Setup des stats et ajout des repo . et .. sur le bloque.
   pInodeDir.Block[0] = blNum;
@@ -439,7 +472,39 @@ int bd_truncate(const char *pFilename, int NewSize) {
 }
 
 int bd_rmdir(const char *pFilename) {
-	return -1;
+  char strSubDir[FILENAME_SIZE];
+  char strFilename[FILENAME_SIZE];
+  ino subDirIno, dirNameIno;
+  if(GetDirFromPath(pFilename, strSubDir) == 0) {
+    return -1; //pDirName ne contient aucun /.
+  }
+  if(GetFilenameFromPath(pFilename, strFilename) == 0) {
+    return -1; //Invalide.
+  }
+  subDirIno = getInodeFromPath(strSubDir);
+  dirNameIno = getInodeFromPath(pFilename);
+  if(subDirIno == -1 || dirNameIno == -1) {
+    return -1; //N'existe pas.
+  }
+  iNodeEntry pInodeSubDir, pInodeDir;
+  if(getInodeEntry(subDirIno,&pInodeSubDir) == -1){
+    return -1; //Invalide iNodeEntry
+  }
+  if(getInodeEntry(subDirIno,&pInodeSubDir) == -1) {
+    return -1; 
+  }
+  if(NumberofDirEntry(pInodeDir.iNodeStat.st_size) > 2) {
+    return -3; //Pas vide.
+  }
+  if(pInodeDir.iNodeStat.st_mode & G_IFREG) {
+    return -2; //Fichier régulier.
+  }
+  
+  removeDir(&pInodeSubDir, dirNameIno);
+  pInodeSubDir.iNodeStat.st_nlink--;
+  releaseFreeBlock(pInodeDir.Block[0]);
+  releaseFreeInode(dirNameIno);
+  return 0;
 }
 
 int bd_rename(const char *pFilename, const char *pDestFilename) {
