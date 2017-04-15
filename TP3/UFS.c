@@ -331,6 +331,7 @@ int bd_create(const char *pFilename) {
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   ino iNodeNumber = getInodeFromPath(pFilename);
+  printf("iNodeNumber du fichier: %i", iNodeNumber);
   if (iNodeNumber == -1)
     return -1; //Le fichier n'existe pas.
 
@@ -407,13 +408,13 @@ int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
     return -1; // Le fichier spécifié n'est pas un directory.
   
   char dirEntries[BLOCK_SIZE];
-  ReadBlock(diriNode.Block[0], dirEntries)
-  for (int i = 0; i < diriNode.iNodeStat.st_size; i++)
-  {
-    
-  }
+  ReadBlock(diriNode.Block[0], dirEntries);
+  int dirSize = diriNode.iNodeStat.st_size;
 
-  return 0;
+  *ppListeFichiers = (DirEntry*) malloc(dirSize);
+	memcpy((*ppListeFichiers), dirEntries, dirSize);
+
+  return NumberofDirEntry(dirSize);
 }
 
 int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
