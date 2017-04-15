@@ -391,12 +391,38 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
 }
 
 int bd_mkdir(const char *pDirName) {
-  char strDir[BLOCK_SIZE];
-  ino subDirIno;
-  GetDirFromPath(pDirName, strDir);
-  subDirIno = getInodeFromPath(strDir);
+  char strSubDir[FILENAME_SIZE];
+  char strFilename[FILENAME_SIZE];
+  ino subDirIno, dirNameIno;
+  if(GetDirFromPath(pDirName, strSubDir) == 0) {
+    return -1; //pDirName ne contient aucun /.
+  }
+  if(GetFilenameFromPath(pDirName, strFilename) == 0) {
+    return -1; //Invalide.
+  }
+  subDirIno = getInodeFromPath(strSubDir);
   if(subDirIno == -1) {
-    return -1;
+    return -1; //Le sub directory n'existe pas.
+  }
+  dirNameIno = getInodeFromPath(pDirName);
+  if(dirNameIno != -1) {
+    return -2; //Le nouveau directory existe déjà.
+  }
+  iNodeEntry pInodeSubDir;
+  if(getInodeEntry(subDirIno,&pInodeSubDir)== -1){
+    return -1; //Invalide iNodeEntry
+  }
+  if(pInodeSubDir.iNodeStat.st_mode & G_IFREG) {
+    return -1; //Sub directory n'est pas un répertoire.
+  }
+
+  dirNameIno = takeFreeInode();
+  if(dirNameIno == -1) {
+    return -1; //Plein.
+  }
+  int blNum  = takeFreeBlock();
+  if( blNum == -1){
+    return -1; //Plein.
   }
   iNodeEntry pInodeDir;
   getInodeEntry(dirNameIno,&pInodeDir);
@@ -424,9 +450,7 @@ int bd_mkdir(const char *pDirName) {
   strcpy(pDir->Filename, "..");
   WriteBlock(blNum, block);
   
-  printf("%s", strDir);
-  
-  return -1;
+  return 0;
 }
 
 int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes) { 
