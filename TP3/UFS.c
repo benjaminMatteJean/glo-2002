@@ -547,7 +547,63 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
 }
 
 int bd_unlink(const char *pFilename) {
-	return -1;
+  char dName[BLOCK_SIZE], fName[FILENAME_SIZE];
+  GetDirFromPath(pFilename, dName);
+  GetFilenameFromPath(pFilename, fName);
+
+  ino dIno = getInodeFromPath(dName);
+  ino fIno = getInodeFromPath(pFilename);
+  iNodeEntry dIE, fIE;
+
+  if(dIno == -1 || fIno == -1) {
+    return -1; //Fichier ou repertoire non existant.
+  }
+
+  if(getInodeEntry(dIno, &dIE) != 0) {
+    return -1; //Le repertoire n'existe pas.
+  }
+
+  if(getInodeEntry(fIno, &fIE) != 0) {
+    return -1; //Le fichier n'existe pas.
+  }
+
+  if(fIE.iNodeStat.st_mode & G_IFDIR) {
+    return -2; //Le fichier est un répertoire.
+  }
+
+  char data[BLOCK_SIZE];
+  ReadBlock(dIE.Block[0], data);
+  DirEntry *pDE = (DirEntry *) data;
+  int entryNumber = NumberofDirEntry(dIE.iNodeStat.st_size);
+  int entry, offset;
+  for(entry = 0; entry < entryNumber; entry++){
+    if(strcmp(pDE[entry].Filename, fName) == 0) {
+      if(entry != entryNumber - 1)//S'il n'est pas déjà dernier, on mets à jour la table DirEntry en décalant chacun des élments plus loin
+      {
+	for(offset =1; offset < entryNumber - entry; offset++){
+	  pDE[entry + (offset - 1)] = pDE[entry + offset];
+	}
+	break;
+      }
+    }
+  }
+  WriteBlock(dIE.Block[0], data); //Enregistre le compactage
+
+  fIE.iNodeStat.st_nlink--; //Décrémente nLink
+  if(fIE.iNodeStat.st_nlink == 0){
+    if(fIE.iNodeStat.st_blocks > 0){
+      releaseFreeBlock(fIE.Block[0]); //Si le nombre de lien est à 0, on lache les inode et bloque du fichier.
+    }
+    releaseFreeInode(fIno);
+  }
+  else{
+    writeInode(&fIE);
+  }
+
+  dIE.iNodeStat.st_size -= sizeof(DirEntry);
+  writeInode(&dIE);
+  
+  return 0;
 }
 
 int bd_truncate(const char *pFilename, int NewSize) {
