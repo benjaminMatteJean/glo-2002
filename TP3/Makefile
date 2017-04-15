@@ -11,7 +11,7 @@ TestsUnitaires : UFS.o TestsUnitaires.o DisqueStegano.o lodepng.o
 	gcc TestsUnitaires.o UFS.o DisqueStegano.o lodepng.o -o TestsUnitaires
 
 ufs: UFS.o main_ufs.o DisqueStegano.o lodepng.o
-	gcc main_ufs.o UFS.o DisqueStegano.o lodepng.o  -g -o ufs
+	gcc main_ufs.o UFS.o DisqueStegano.o lodepng.o  -g -o ufs; cp google-go.png.orig google-go.png
 
 glofs: glofs.c UFS.o DisqueStegano.o
 	gcc -D_FILE_OFFSET_BITS=64 -Wall glofs.c UFS.o DisqueStegano.o lodepng.o -o glofs -g -lfuse 
