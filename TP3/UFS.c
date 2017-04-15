@@ -392,37 +392,6 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
 
 int bd_mkdir(const char *pDirName) {
   char strSubDir[FILENAME_SIZE];
-<<<<<<< HEAD
-	char strFilename[FILENAME_SIZE];
-  ino subDirIno, dirNameIno;
-
-  if (GetDirFromPath(pDirName, strSubDir) == 0)
-		return -1; // pDirName ne contient aucun /.
-	if (GetFilenameFromPath(pDirName, strFilename) == 0)
-		return -1; // Invalide
-  subDirIno = getInodeFromPath(strSubDir);
-  if (subDirIno == -1)
-    return -1; // Le subDirectory n'existe pas.
-
-	dirNameIno = getInodeFromPath(pDirName);
-	if (dirNameIno != -1)
-		return -2; // Le nouveau directory existe déjà.
-
-  iNodeEntry pInodeSubDir;
-  if (getInodeEntry(subDirIno, &pInodeSubDir) == -1)
-		return -1; // SubDirectory n'est pas un répertoire.
-
-	dirNameIno = takeFreeInode();
-	if (dirNameIno == -1)
-		return -1; // Plein.
-
-	int blNum = takeFreeBlock();
-	if (blNum == -1)
-		return -1; // Plein.
-
-	iNodeEntry pInodeDir;
-	getInodeEntry(dirNameIno, &pInodeDir);
-=======
   char strFilename[FILENAME_SIZE];
   ino subDirIno, dirNameIno;
   if(GetDirFromPath(pDirName, strSubDir) == 0) {
