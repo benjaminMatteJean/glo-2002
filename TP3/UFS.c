@@ -508,7 +508,48 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 }
 
 int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
-	return -1;
+  char dirNewLink[FILENAME_SIZE];
+  GetDirFromPath(pPathNouveauLien, dirNewLink);
+
+  ino existingIno = getInodeFromPath(pPathExistant);
+  ino newLinkIno = getInodeFromPath(dirNewLink);
+  iNodeEntry existingIE, newLinkIE;
+
+  if(existingIno == -1 || newLinkIno == -1) {
+    return -1; //Un des fichiers est inexistant.
+  }
+
+  if(getInodeEntry(existingIno, &existingIE) != 0) {
+    return -1; //pPathExisant n'existe pas.
+  }
+
+  if(getInodeEntry(newLinkIno, &newLinkIE) != 0) {
+    return -1; //pPathNouveauLien n'existe pas.
+  }
+
+  if(getInodeFromPath(pPathNouveauLien) != -1) {
+    return -2; //Le fichier nouveauLien existe déjà.
+  }
+
+  if(existingIE.iNodeStat.st_mode & G_IFDIR) {
+    return -3; //C'est un répertoire.
+  }
+
+  char data[BLOCK_SIZE], newLinkName[FILENAME_SIZE];
+  GetFilenameFromPath(pPathNouveauLien, newLinkName);
+  ReadBlock(newLinkIE.Block[0], data);
+  DirEntry *pEntries = (DirEntry *) data;
+  int entryNumber = NumberofDirEntry(newLinkIE.iNodeStat.st_size);
+  pEntries[entryNumber].iNode = existingIE.iNodeStat.st_ino; //On assigne l'inode du fichier existant à la fin des entries.
+  strcpy(pEntries[entryNumber].Filename, newLinkName); //Le nom du fichier aussi.
+  newLinkIE.iNodeStat.st_size += sizeof(DirEntry);
+  existingIE.iNodeStat.st_nlink++;
+
+  writeInode(&existingIE);
+  writeInode(&newLinkIE);
+  WriteBlock(newLinkIE.Block[0], data);
+  
+  return 0;
 }
 
 int bd_unlink(const char *pFilename) {
