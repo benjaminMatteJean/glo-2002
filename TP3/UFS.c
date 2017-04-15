@@ -198,7 +198,7 @@ int takeFreeInode(){
   ReadBlock(FREE_INODE_BITMAP, data);
   int numInode=ROOT_INODE;
   
-  while(data[numInode] == 0 && numInode > N_INODE_ON_DISK) {
+  while(data[numInode] == 0 && numInode < N_INODE_ON_DISK) {
     numInode++;
   }
   if(numInode >= N_BLOCK_ON_DISK) {
@@ -257,7 +257,7 @@ void addFileDirInDir(iNodeEntry * destDir, ino fileIno, char * filename) {
   ReadBlock(blNum, data);
   pDirEntry = (DirEntry *) data;
 
-  pDirEntry += nEntries -1; //Sa place dans le bloc.
+  pDirEntry += (nEntries -1); //Sa place dans le bloc.
   pDirEntry->iNode = fileIno;
   strcpy(pDirEntry->Filename, filename);
   WriteBlock(blNum, data);
@@ -324,7 +324,7 @@ int bd_create(const char *pFilename) {
 
   iNodeEntry pInodeDir;
   getInodeEntry(dirInode, &pInodeDir);
-  addFileDirInDir(&pInodeFile, fileInode, strFile);
+  addFileDirInDir(&pInodeDir, fileInode, strFile);
   
   return 0; //ça passe
 }
