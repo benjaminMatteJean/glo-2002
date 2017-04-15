@@ -106,14 +106,12 @@ int getInodeFromParent(const char *pFilename, int parentIno) {
   int inoBNum = BASE_BLOCK_INODE;
   if((parentIno / NUM_INODE_PER_BLOCK) >= 1)
     inoBNum++;
-
   ReadBlock(inoBNum, data);
   iNodeEntry *pINodes = (iNodeEntry *) data;
   //Position de l'inode du parent.
   UINT16 inoPos = parentIno % NUM_INODE_PER_BLOCK;
   //Nombre d'entrées dans le répertoire parent.
   UINT16 nEntries = NumberofDirEntry(pINodes[inoPos].iNodeStat.st_size);
-
   ReadBlock(pINodes[inoPos].Block[0], data);
   DirEntry *pDE = (DirEntry *) data;
 
@@ -127,20 +125,23 @@ int getInodeFromParent(const char *pFilename, int parentIno) {
 
 /*Retourne le numéro d'Inode de pFilename par récursion.*/
 int getInode(const char *pPath, const char *pFilename, int parentIno) {
-  if (parentIno == -1)
+  if (parentIno == -1) {
     return -1;
-
+  }
   char pName[FILENAME_SIZE];
   int iChar, iSlash=0;
   for (iChar =0; iChar < FILENAME_SIZE; iChar++) {
-    if (pPath[iChar] == 0)
+    if (pPath[iChar] == 0){
       break;
-    else if (pPath[iChar] == "/" && iChar != 0)
+    }
+    else if (pPath[iChar] == '/' && iChar != 0){
       break;
-    else if (pPath[iChar] == "/")
+    }
+    else if (pPath[iChar] == '/'){
       iSlash++;
+    }
     else {
-      pName[iChar-iSlash] = pPath[iChar];
+      pName[(iChar-iSlash)] = pPath[iChar];
     }
   }
   pName[iChar - iSlash] = 0;
@@ -280,6 +281,7 @@ int bd_countfreeblocks(void) {
 int bd_stat(const char *pFilename, gstat *pStat) {
   ino fileInode = getInodeFromPath(pFilename);
   if (fileInode == -1) {
+    printf("fileInode == -1");
     return -1; //N'existe pas.
   }
 
@@ -322,7 +324,7 @@ int bd_create(const char *pFilename) {
 
   iNodeEntry pInodeDir;
   getInodeEntry(dirInode, &pInodeDir);
-  addFileDirInDir(&pInodeFile, fileInode, pFilename);
+  addFileDirInDir(&pInodeFile, fileInode, strFile);
   
   return 0; //ça passe
 }
@@ -357,7 +359,17 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
 }
 
 int bd_mkdir(const char *pDirName) {
-	return -1;
+  char strDir[BLOCK_SIZE];
+  ino subDirIno;
+  GetDirFromPath(pDirName, strDir);
+  subDirIno = getInodeFromPath(strDir);
+  if(subDirIno == -1) {
+    return -1;
+  }
+  
+  printf("%s", strDir);
+  
+  return -1;
 }
 
 int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes) { 
