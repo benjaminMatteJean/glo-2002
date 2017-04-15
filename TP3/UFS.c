@@ -331,7 +331,6 @@ int bd_create(const char *pFilename) {
 
 int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   ino iNodeNumber = getInodeFromPath(pFilename);
-  printf("iNodeNumber du fichier: %i", iNodeNumber);
   if (iNodeNumber == -1)
     return -1; //Le fichier n'existe pas.
 
@@ -343,7 +342,7 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   
   int fileSize = fileiNode.iNodeStat.st_size;
   if(offset >= fileSize)
-    return 0; //Incapable de lire, car position de départ plus élevée que la taille du fichier.
+    return 0; // Incapable de lire, car position de départ plus élevée que la taille du fichier.
 
   /*Ici, on ajuste la taille du fichier à lire. C'est-à-dire, si offset+numbytes est plus grand
     que la taille du fichier, on réduit numbytes pour que offset+numbytes == fileSize.*/
@@ -353,77 +352,71 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
   char fileData[BLOCK_SIZE];
   ReadBlock(fileiNode.Block[0], fileData);
   for (int i = offset; i < (offset + numbytes); i++)
-  {
     buffer[i] = fileData[i];
-  }
+
   return numbytes;
 }
 
 int bd_mkdir(const char *pDirName) {
-  char strSubDir[FILENAME_SIZE];
-  char strFilename[FILENAME_SIZE];
-  ino subDirIno, dirNameIno;
-  if(GetDirFromPath(pDirName, strSubDir) == 0) {
-    return -1; //pDirName ne contient aucun /.
-  }
-  if(GetFilenameFromPath(pDirName, strFilename) == 0) {
-    return -1; //Invalide.
-  }
-  subDirIno = getInodeFromPath(strSubDir);
+  char strDir[BLOCK_SIZE];
+  ino subDirIno;
+  GetDirFromPath(pDirName, strDir);
+  subDirIno = getInodeFromPath(strDir);
   if(subDirIno == -1) {
-    return -1; //Le sub directory n'existe pas.
+    return -1;
   }
-  dirNameIno = getInodeFromPath(pDirName);
-  if(dirNameIno != -1) {
-    return -2; //Le nouveau directory existe déjà.
-  }
-  iNodeEntry pInodeSubDir;
-  if(getInodeEntry(subDirIno,&pInodeSubDir)== -1){
-    return -1; //Invalide iNodeEntry
-  }
-  if(pInodeSubDir.iNodeStat.st_mode & G_IFREG) {
-    return -1; //Sub directory n'est pas un répertoire.
-  }
-
-  dirNameIno = takeFreeInode();
-  if(dirNameIno == -1) {
-    return -1; //Plein.
-  }
-  int blNum  = takeFreeBlock();
-  if( blNum == -1){
-    return -1; //Plein.
-  }
-  iNodeEntry pInodeDir;
-  getInodeEntry(dirNameIno,&pInodeDir);
-
-  //incrémente le nb de liens + écrit sur disque et ajoute un directory dans le directory parent.
-  pInodeSubDir.iNodeStat.st_nlink++;
-  writeInode(&subDirIno);
-  addFileDirInDir(&pInodeSubDir, dirNameIno, strFilename);
-  //Setup des stats et ajout des repo . et .. sur le bloque.
-  pInodeDir.Block[0] = blNum;
-  pInodeDir.iNodeStat.st_ino = dirNameIno;
-  pInodeDir.iNodeStat.st_mode = G_IFDIR;
-  pInodeDir.iNodeStat.st_nlink = 2;
-  pInodeDir.iNodeStat.st_size = sizeof(DirEntry) * 2;
-  pInodeDir.iNodeStat.st_blocks = 1;
-  pInodeDir.iNodeStat.st_mode|=G_IRWXU|G_IRWXG;
-  writeInode(&pInodeDir);
-  char block[BLOCK_SIZE];
-  ReadBlock(blNum, block);
-  DirEntry *pDir = (DirEntry *) block;
-  pDir->iNode = dirNameIno;
-  strcpy(pDir->Filename, ".");
-  pDir++;
-  pDir->iNode = subDirIno;
-  strcpy(pDir->Filename, "..");
-  WriteBlock(blNum, block);
   
-  return 0;
+  printf("%s", strDir);
+  
+  return -1;
 }
 
 int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes) { 
-	return -1;
+	ino iNodeNumber = getInodeFromPath(pFilename);
+  if (iNodeNumber == -1)
+    return -1; // Le fichier n'existe pas.
+
+  iNodeEntry fileiNode;
+  getInodeEntry(iNodeNumber, &fileiNode);
+
+  if (fileiNode.iNodeStat.st_mode & G_IFDIR)
+		return -2; // Ce n'est pas un fichier, mais un répertoire.
+
+	int fileSize = fileiNode.iNodeStat.st_size;
+
+	if (offset > fileSize && offset < BLOCK_SIZE*N_BLOCK_PER_INODE)
+		return -3; // Impossible d'écrire, car position de départ plus élevée que la taille du fichier.
+
+	if (offset >= BLOCK_SIZE*N_BLOCK_PER_INODE)
+		return -4; // Impossible d'écrire, taille maximale allouée pour un fichier dépassée.
+
+	// Si l'espace à écrire dépasse la limite, on réduit l'espace à écrire jusqu'à la limite permise.
+	if ((offset + numbytes) >= BLOCK_SIZE*N_BLOCK_PER_INODE)
+		numbytes = (BLOCK_SIZE*N_BLOCK_PER_INODE - offset);
+
+	// Si le nombre de bytes à écrire est supérieur à ceux dans buffer, on le réduit au nombre dans buffer.
+	if (numbytes > strlen(buffer))
+		numbytes = strlen(buffer);
+
+	// Les lignes suivantes écrivent les données dans le fichier, aux endroits assignés.
+	char fileData[BLOCK_SIZE];
+  ReadBlock(fileiNode.Block[0], fileData);
+	for (int i = offset; i < (offset + numbytes); i++)
+    fileData[i] = buffer[i];
+	WriteBlock(fileiNode.Block[0], fileData);
+
+	// Les lignes suivantes déterminent la nouvelle taille du fichier.
+	int newFileSize;
+	if (offset + numbytes <= fileSize)
+		newFileSize = fileSize;
+	else
+	{
+		int newBytes = (offset + numbytes) - fileSize;
+		newFileSize = fileSize + newBytes;
+	}
+	fileiNode.iNodeStat.st_size = newFileSize;
+
+	return numbytes;
 }
 
 int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
