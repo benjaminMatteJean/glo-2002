@@ -95,7 +95,73 @@ void printiNode(iNodeEntry iNode) {
 				  à vous de jouer, maintenant!
    ---------------------------------------------------------------------------------------- */
 
-//Auxiliaires
+/* Les fonctions suivantes sont des fonctions auxiliaires qui facilitent l'accès, la lecture
+ * et l'écriture des différents iNodes et blocs.
+ */
+
+/*Retourne le numéro d'un bloc libre, -1 sinon. */
+int takeFreeBlock() {
+  char freeBlocks[BLOCK_SIZE];
+  ReadBlock(FREE_BLOCK_BITMAP, freeBlocks);
+
+  int free = -1;
+  
+	for (int i = 6; i < N_BLOCK_ON_DISK; i++) {
+		if(freeBlocks[i] != 0)
+			free = i;
+	}
+	if (free == -1)
+		return -1;
+
+	// On indique que le bloc free est maintenant saisi
+  freeBlocks[free] = 0;
+  printf("GLOFS: Saisie bloc %d\n", free);
+  WriteBlock(FREE_BLOCK_BITMAP, freeBlocks);
+
+  return free;
+}
+
+/*Retourne le numéro d'un inode libre.*/
+int takeFreeiNode(){
+  char freeiNodes[BLOCK_SIZE];
+  ReadBlock(FREE_INODE_BITMAP, freeiNodes);
+
+  int free = -1;
+  
+  for (int i = 0; i < N_INODE_ON_DISK; i++) {
+		if(freeiNodes[i] != 0)
+			free = i;
+	}
+	if (free == -1)
+		return -1;
+
+	// On indique que l'iNode free est maintenant saisi
+  freeiNodes[free] = 0;
+  printf("GLOFS: Saisie i-node %d\n", free);
+  WriteBlock(FREE_INODE_BITMAP, freeiNodes);
+
+  return free;
+}
+
+/*Rend le bloc BlockNum libre sur le bitmap*/
+int releaseBlock(UINT16 BlockNum) {
+  char BlockFreeBitmap[BLOCK_SIZE];
+  ReadBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
+  BlockFreeBitmap[BlockNum] = 1;
+  printf("GLOFS: Relache bloc %d\n",BlockNum);
+  WriteBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
+  return 1;
+}
+
+/*Relache l'inode passé en paramètre*/
+int releaseInode(int inoNum) {
+  char data[BLOCK_SIZE];
+  ReadBlock(FREE_INODE_BITMAP, data);
+  data[inoNum] = 1;
+  printf("GLOFS: Relache i-node %d\n", inoNum);
+  WriteBlock(FREE_INODE_BITMAP, data);
+  return 1;
+}
 
 /*Retourne le numéro d'Inode d'un pFilename dans le répertoire spécifié par parentIno.*/
 int getInodeFromParent(const char *pFilename, int parentIno) {
@@ -123,7 +189,11 @@ int getInodeFromParent(const char *pFilename, int parentIno) {
   return -1; //Si le nom de fichier n'existe pas...
 }
 
-/*Retourne le numéro d'Inode de pFilename par récursion.*/
+/* Retourne le numéro d'iNode de pFilename par récursion.
+ * @param pPath, le path du fichier/répertoire désiré
+ * @param pFilename, le nom du fichier/répertoire
+ * @param parentIno, le numéro d'iNode du parent
+ */
 int getInode(const char *pPath, const char *pFilename, int parentIno) {
   if (parentIno == -1) {
     return -1;
@@ -153,72 +223,19 @@ int getInode(const char *pPath, const char *pFilename, int parentIno) {
   } 
 }
 
-/*Retourne le numéro d'inode spécifié par le chemin pPath.*/
+/* Retourne le numéro d'iNode correspondant au path en paramètre.
+ * @param pPath, le path du fichier/répertoire désiré
+ */
 int getInodeFromPath(const char *pPath){
-  if(strcmp(pPath, "/") == 0)
+  if(pPath == "/")
     return ROOT_INODE;
-  char pName[FILENAME_SIZE];
-  if(GetFilenameFromPath(pPath, pName) == 0)
-    pName[0] = 0;
-  return getInode(pPath, pName, ROOT_INODE);
-}
 
-/*Retourne le numéro d'un bloc libre, -1 sinon. */
-int takeFreeBlock() {
-  char data[BLOCK_SIZE];
-  ReadBlock(FREE_BLOCK_BITMAP, data);
-  int numBlock=BASE_BLOCK_INODE + (N_INODE_ON_DISK / NUM_INODE_PER_BLOCK);
-  
-  while(data[numBlock] == 0 && numBlock < N_BLOCK_ON_DISK) {
-    numBlock++;
-  }
-  if(numBlock >= N_BLOCK_ON_DISK) {
-    return -1;
-  }
+  char filename[FILENAME_SIZE];
 
-  data[numBlock] = 0;
-  printf("GLOFS: Saisie bloc %d\n",numBlock);
-  WriteBlock(FREE_BLOCK_BITMAP, data);
-  return numBlock;
-}
+  if(GetFilenameFromPath(pPath, filename) == 0)
+    filename[0] = 0;
 
-/*Rend le bloc BlockNum libre sur le bitmap*/
-int releaseFreeBlock(UINT16 BlockNum) {
-  char BlockFreeBitmap[BLOCK_SIZE];
-  ReadBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
-  BlockFreeBitmap[BlockNum] = 1;
-  printf("GLOFS: Relache bloc %d\n",BlockNum);
-  WriteBlock(FREE_BLOCK_BITMAP, BlockFreeBitmap);
-  return 1;
-}
-
-/*Retourne le numéro d'un inode libre.*/
-int takeFreeInode(){
-  char data[BLOCK_SIZE];
-  ReadBlock(FREE_INODE_BITMAP, data);
-  int numInode=ROOT_INODE;
-  
-  while(data[numInode] == 0 && numInode < N_INODE_ON_DISK) {
-    numInode++;
-  }
-  if(numInode >= N_BLOCK_ON_DISK) {
-    return -1;
-  }
-
-  data[numInode] = 0;
-  printf("GLOFS: Saisie i-node %d\n",numInode);
-  WriteBlock(FREE_INODE_BITMAP, data);
-  return numInode;
-}
-
-/*Relache l'inode passé en paramètre*/
-int releaseFreeInode(int inoNum) {
-  char data[BLOCK_SIZE];
-  ReadBlock(FREE_INODE_BITMAP, data);
-  data[inoNum] = 1;
-  printf("GLOFS: Relache i-node %d\n", inoNum);
-  WriteBlock(FREE_INODE_BITMAP, data);
-  return 1;
+  return getInode(pPath, filename, ROOT_INODE);
 }
 
 /*Retourne le iNodeEntry correspondant au numéro d'inode valide donné. -1 sinon.*/
@@ -343,7 +360,7 @@ int bd_create(const char *pFilename) {
     return -2; //Le fichier existe déjà.
   }
 
-  fileInode = takeFreeInode();
+  fileInode = takeFreeiNode();
   iNodeEntry pInodeFile;
   getInodeEntry(fileInode,&pInodeFile);
   pInodeFile.iNodeStat.st_ino = fileInode;
@@ -415,7 +432,7 @@ int bd_mkdir(const char *pDirName) {
     return -1; //Sub directory n'est pas un répertoire.
   }
 
-  dirNameIno = takeFreeInode();
+  dirNameIno = takeFreeiNode();
   if(dirNameIno == -1) {
     return -1; //Plein.
   }
@@ -598,9 +615,9 @@ int bd_unlink(const char *pFilename) {
   fIE.iNodeStat.st_nlink--; //Décrémente nLink
   if(fIE.iNodeStat.st_nlink == 0){
     if(fIE.iNodeStat.st_blocks > 0){
-      releaseFreeBlock(fIE.Block[0]); //Si le nombre de lien est à 0, on lache les inode et bloque du fichier.
+      releaseBlock(fIE.Block[0]); //Si le nombre de lien est à 0, on lache les inode et bloque du fichier.
     }
-    releaseFreeInode(fIno);
+    releaseInode(fIno);
   }
   else{
     writeInode(&fIE);
@@ -631,7 +648,7 @@ int bd_truncate(const char *pFilename, int NewSize) {
     return currentSize;
   }
   else if( NewSize == 0){
-    releaseFreeBlock(fileiNode.Block[0]);
+    releaseBlock(fileiNode.Block[0]);
     fileiNode.iNodeStat.st_size = 0;
     fileiNode.iNodeStat.st_blocks = 0;
     writeInode(&fileiNode);
@@ -680,8 +697,8 @@ int bd_rmdir(const char *pFilename) {
   removeDir(&pInodeSubDir, dirNameIno);
   pInodeSubDir.iNodeStat.st_nlink--;
   writeInode(&pInodeSubDir);
-  releaseFreeBlock(pInodeDir.Block[0]);
-  releaseFreeInode(dirNameIno);
+  releaseBlock(pInodeDir.Block[0]);
+  releaseInode(dirNameIno);
   return 0;
 }
 
