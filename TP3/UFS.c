@@ -613,7 +613,38 @@ int bd_unlink(const char *pFilename) {
 }
 
 int bd_truncate(const char *pFilename, int NewSize) {
-	return -1;
+  ino iNodeNumber = getInodeFromPath(pFilename);
+  if (iNodeNumber == -1)
+    return -1; // Le fichier n'existe pas.
+
+  iNodeEntry fileiNode;
+  if(getInodeEntry(iNodeNumber, &fileiNode) != 0)
+    return -1;
+
+  if (fileiNode.iNodeStat.st_mode & G_IFDIR)
+    return -2; // Ce n'est pas un fichier, mais un répertoire.
+
+  char data[BLOCK_SIZE];
+  int bytes;
+  int currentSize = fileiNode.iNodeStat.st_size;
+  if (NewSize > currentSize ) {
+    return currentSize;
+  }
+  else if( NewSize == 0){
+    releaseFreeBlock(fileiNode.Block[0]);
+    fileiNode.iNodeStat.st_size = 0;
+    fileiNode.iNodeStat.st_blocks = 0;
+    writeInode(&fileiNode);
+    return 0;
+  }
+  else {
+    for(bytes = currentSize; bytes > (currentSize - NewSize); bytes--) {
+      data[bytes] = 0;
+    }
+    fileiNode.iNodeStat.st_size = NewSize;
+    writeInode(&fileiNode);
+  }
+  return NewSize;
 }
 
 int bd_rmdir(const char *pFilename) {
@@ -655,29 +686,29 @@ int bd_rmdir(const char *pFilename) {
 }
 
 int bd_rename(const char *pFilename, const char *pDestFilename) {
-	ino iNodeNumberSource = getInodeFromPath(pFilename);
-	ino iNodeNumberTarget = getInodeFromPath(pDestFilename);
-	if (iNodeNumberSource == -1 || iNodeNumberTarget == -1)
-		return -1; // Au moins un des paths n'est pas valide.
+  ino iNodeNumberSource = getInodeFromPath(pFilename);
+  ino iNodeNumberTarget = getInodeFromPath(pDestFilename);
+  if (iNodeNumberSource == -1 || iNodeNumberTarget == -1)
+    return -1; // Au moins un des paths n'est pas valide.
 
-	if (pFilename == pDestFilename)
-		return 0; // Paths identiques, pas de modifications à effectuer.
+  if (pFilename == pDestFilename)
+    return 0; // Paths identiques, pas de modifications à effectuer.
 
-	// Si ce sont 2 fichiers, alors on peut les hardlink et simplement unlink la source.
-	if (bd_hardlink(pFilename, pDestFilename) == 0)
-		return bd_unlink(pFilename);
-	// S'il y a un fichier et un répertoire, c'est un échec.
-	else if (bd_hardlink(pFilename, pDestFilename) == -2 || (bd_hardlink(pFilename, pDestFilename) == -1))
-		return -1;
-	else { // Les 2 paths sont des répertoires
+  // Si ce sont 2 fichiers, alors on peut les hardlink et simplement unlink la source.
+  if (bd_hardlink(pFilename, pDestFilename) == 0)
+    return bd_unlink(pFilename);
+  // S'il y a un fichier et un répertoire, c'est un échec.
+  else if (bd_hardlink(pFilename, pDestFilename) == -2 || (bd_hardlink(pFilename, pDestFilename) == -1))
+    return -1;
+  else { // Les 2 paths sont des répertoires
 	
-		iNodeEntry *iNodeTarget;
-		iNodeEntry *iNodeSource;
+    iNodeEntry *iNodeTarget;
+    iNodeEntry *iNodeSource;
 
-		getInodeEntry(iNodeNumberSource, iNodeSource);
-  	getInodeEntry(iNodeNumberTarget, iNodeTarget);
+    getInodeEntry(iNodeNumberSource, iNodeSource);
+    getInodeEntry(iNodeNumberTarget, iNodeTarget);
 
-	}
+  }
 }
 
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
