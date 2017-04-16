@@ -429,7 +429,7 @@ int bd_mkdir(const char *pDirName) {
 
   //incrémente le nb de liens + écrit sur disque et ajoute un directory dans le directory parent.
   pInodeSubDir.iNodeStat.st_nlink++;
-  writeInode(&subDirIno);
+  writeInode(&pInodeSubDir);
   addFileDirInDir(&pInodeSubDir, dirNameIno, strFilename);
   //Setup des stats et ajout des repo . et .. sur le bloque.
   pInodeDir.Block[0] = blNum;
@@ -668,7 +668,7 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 	if (bd_hardlink(pFilename, pDestFilename) == 0)
 		return bd_unlink(pFilename);
 	// S'il y a un fichier et un répertoire, c'est un échec.
-	else if (bd_hardlink(pFilename, pDestFilename) == -2 || (bd_hardlink(pFilename, pDestFilename) == -1)
+	else if (bd_hardlink(pFilename, pDestFilename) == -2 || (bd_hardlink(pFilename, pDestFilename) == -1))
 		return -1;
 	else { // Les 2 paths sont des répertoires
 	
