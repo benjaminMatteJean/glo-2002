@@ -429,7 +429,7 @@ int bd_mkdir(const char *pDirName) {
 
   //incrémente le nb de liens + écrit sur disque et ajoute un directory dans le directory parent.
   pInodeSubDir.iNodeStat.st_nlink++;
-  writeInode(&subDirIno);
+  writeInode(&pInodeSubDir);
   addFileDirInDir(&pInodeSubDir, dirNameIno, strFilename);
   //Setup des stats et ajout des repo . et .. sur le bloque.
   pInodeDir.Block[0] = blNum;
@@ -463,50 +463,53 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
   getInodeEntry(iNodeNumber, &fileiNode);
 
   if (fileiNode.iNodeStat.st_mode & G_IFDIR)
-		return -2; // Ce n'est pas un fichier, mais un répertoire.
+    return -2; // Ce n'est pas un fichier, mais un répertoire.
 
-	int fileSize = fileiNode.iNodeStat.st_size;
+  int fileSize = fileiNode.iNodeStat.st_size;
 
-	if (offset > fileSize && offset < BLOCK_SIZE*N_BLOCK_PER_INODE)
-		return -3; // Impossible d'écrire, car position de départ plus élevée que la taille du fichier.
+  if (offset > fileSize && offset < BLOCK_SIZE*N_BLOCK_PER_INODE)
+    return -3; // Impossible d'écrire, car position de départ plus élevée que la taille du fichier.
 
-	if (offset >= BLOCK_SIZE*N_BLOCK_PER_INODE)
-		return -4; // Impossible d'écrire, taille maximale allouée pour un fichier dépassée.
+  if (offset >= BLOCK_SIZE*N_BLOCK_PER_INODE)
+    return -4; // Impossible d'écrire, taille maximale allouée pour un fichier dépassée.
 
-	// Si l'espace à écrire dépasse la limite, on réduit l'espace à écrire jusqu'à la limite permise.
-	if ((offset + numbytes) >= BLOCK_SIZE*N_BLOCK_PER_INODE) {
-		int newBlock = takeFreeBlock();
-		if (newBlock == -1)
-			printf("reached.\n");//return 0; // Aucun bloc libre disponible.
-		fileiNode.Block[0] = newBlock;
-	}
+  // Si l'espace à écrire dépasse la limite, on réduit l'espace à écrire jusqu'à la limite permise.
+  if ((offset + numbytes) >= BLOCK_SIZE*N_BLOCK_PER_INODE) {
+    numbytes = numbytes - ((offset + numbytes) - fileSize);
+  }
+  
+  if (fileSize == 0 && fileiNode.iNodeStat.st_blocks == 0) {
+    int newBlock = takeFreeBlock();
+    if (newBlock == -1)
+      printf("reached.\n");//return 0; // Aucun bloc libre disponible.
+    fileiNode.Block[0] = newBlock;
+  }
 	
-	// Si le fichier ne contient aucune donnée, on crée un nouveau bloc.
-	if (fileiNode.iNodeStat.st_blocks == 0)
-		fileiNode.iNodeStat.st_blocks = 1;
+  // Si le fichier ne contient aucune donnée, on crée un nouveau bloc.
+  if (fileiNode.iNodeStat.st_blocks == 0)
+    fileiNode.iNodeStat.st_blocks = 1;
 
-	// Le bloc de données est récupéré, modifié puis réécrit.
-	char fileData[BLOCK_SIZE];
+  // Le bloc de données est récupéré, modifié puis réécrit.
+  char fileData[BLOCK_SIZE];
   ReadBlock(fileiNode.Block[0], fileData);
-	for (int i = offset; i < (offset + numbytes); i++)
+  for (int i = offset; i < (offset + numbytes); i++)
     fileData[i] = buffer[i-offset];
-	WriteBlock(fileiNode.Block[0], fileData);
+  WriteBlock(fileiNode.Block[0], fileData);
 
-	// Les lignes suivantes déterminent la nouvelle taille du fichier.
-	int newFileSize;
-	if (numbytes == 0);
-		newFileSize = offset + strlen(buffer);
-	if (offset + numbytes <= fileSize)
-		newFileSize = fileSize;
-	else
-	{
-		int newBytes = (offset + numbytes) - fileSize;
-		newFileSize = fileSize + newBytes;
-	}
-	fileiNode.iNodeStat.st_size = newFileSize;
-	writeInode(&fileiNode);
+  // Les lignes suivantes déterminent la nouvelle taille du fichier.
+  int newFileSize;
+  if (numbytes == 0);
+  newFileSize = offset + strlen(buffer);
+  if (offset + numbytes <= fileSize)
+    newFileSize = fileSize;
+  else {
+    int newBytes = (offset + numbytes) - fileSize;
+    newFileSize = fileSize + newBytes;
+  }
+  fileiNode.iNodeStat.st_size = newFileSize;
+  writeInode(&fileiNode);
 
-	return numbytes;
+  return numbytes;
 }
 
 int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
