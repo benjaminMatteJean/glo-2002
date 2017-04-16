@@ -686,8 +686,6 @@ int bd_rmdir(const char *pFilename) {
 }
 
 int bd_rename(const char *pFilename, const char *pDestFilename) {
-<<<<<<< HEAD
-
 	// Si les répertoires sont identiques, ne rien faire.
 	if(pFilename == pDestFilename)
 		return 0;
@@ -747,31 +745,6 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 
 		return 0;
 	}
-=======
-  ino iNodeNumberSource = getInodeFromPath(pFilename);
-  ino iNodeNumberTarget = getInodeFromPath(pDestFilename);
-  if (iNodeNumberSource == -1 || iNodeNumberTarget == -1)
-    return -1; // Au moins un des paths n'est pas valide.
-
-  if (pFilename == pDestFilename)
-    return 0; // Paths identiques, pas de modifications à effectuer.
-
-  // Si ce sont 2 fichiers, alors on peut les hardlink et simplement unlink la source.
-  if (bd_hardlink(pFilename, pDestFilename) == 0)
-    return bd_unlink(pFilename);
-  // S'il y a un fichier et un répertoire, c'est un échec.
-  else if (bd_hardlink(pFilename, pDestFilename) == -2 || (bd_hardlink(pFilename, pDestFilename) == -1))
-    return -1;
-  else { // Les 2 paths sont des répertoires
-	
-    iNodeEntry *iNodeTarget;
-    iNodeEntry *iNodeSource;
-
-    getInodeEntry(iNodeNumberSource, iNodeSource);
-    getInodeEntry(iNodeNumberTarget, iNodeTarget);
-
-  }
->>>>>>> 18e45b05996aa7c49976bf3f3621dc64f90a5465
 }
 
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
