@@ -455,6 +455,7 @@ int bd_mkdir(const char *pDirName) {
 
 int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes) { 
 	ino iNodeNumber = getInodeFromPath(pFilename);
+	printf("%d", iNodeNumber);
   if (iNodeNumber == -1)
     return -1; // Le fichier n'existe pas.
 
@@ -492,6 +493,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 	ReadBlock(fileiNode.Block[0], fileData);
 	for (int i = offset; i < (offset + numbytes); i++){
 	  fileData[i] = buffer[i];
+	  
 	}
 	WriteBlock(fileiNode.Block[0], fileData);
 
@@ -505,6 +507,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 		newFileSize = fileSize + newBytes;
 	}
 	fileiNode.iNodeStat.st_size = newFileSize;
+	writeInode(&fileiNode);
 
 	return numbytes;
 }
