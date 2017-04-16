@@ -454,9 +454,7 @@ int bd_mkdir(const char *pDirName) {
 }
 
 int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes) {
-	printf("%i\n", numbytes);
 	ino iNodeNumber = getInodeFromPath(pFilename);
-	printf("%d", iNodeNumber);
   if (iNodeNumber == -1)
     return -1; // Le fichier n'existe pas.
 
@@ -476,15 +474,17 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 
 	// Si l'espace à écrire dépasse la limite, on réduit l'espace à écrire jusqu'à la limite permise.
 	if ((offset + numbytes) >= BLOCK_SIZE*N_BLOCK_PER_INODE) {
-		int newBlock = takeFreeBlock();
-		if (newBlock == -1)
-			printf("reached.\n");//return 0; // Aucun bloc libre disponible.
-		fileiNode.Block[0] = newBlock;
+		numbytes = BLOCK_SIZE*N_BLOCK_PER_INODE - offset;
 	}
 	
 	// Si le fichier ne contient aucune donnée, on crée un nouveau bloc.
-	if (fileiNode.iNodeStat.st_blocks == 0)
+	if (fileiNode.iNodeStat.st_blocks == 0) {
+		int newBlock = takeFreeBlock();
+		if (newBlock == -1)
+			return 0; // Aucun bloc libre disponible.
+		fileiNode.Block[0] = newBlock;
 		fileiNode.iNodeStat.st_blocks = 1;
+	}
 
 	// Le bloc de données est récupéré, modifié puis réécrit.
 	char fileData[BLOCK_SIZE];
@@ -495,8 +495,6 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 
 	// Les lignes suivantes déterminent la nouvelle taille du fichier.
 	int newFileSize;
-	if (numbytes == 0);
-		newFileSize = offset + strlen(buffer);
 	if (offset + numbytes <= fileSize)
 		newFileSize = fileSize;
 	else
@@ -669,14 +667,18 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 	// Si ce sont 2 fichiers, alors on peut les hardlink et simplement unlink la source.
 	if (bd_hardlink(pFilename, pDestFilename) == 0)
 		return bd_unlink(pFilename);
-
-	iNodeEntry *iNodeTarget;
-	iNodeEntry *iNodeSource;
-
-	getInodeEntry(iNodeNumberSource, iNodeSource);
-  getInodeEntry(iNodeNumberTarget, iNodeTarget);
-
+	// S'il y a un fichier et un répertoire, c'est un échec.
+	else if (bd_hardlink(pFilename, pDestFilename) == -2 || (bd_hardlink(pFilename, pDestFilename) == -1)
+		return -1;
+	else { // Les 2 paths sont des répertoires
 	
+		iNodeEntry *iNodeTarget;
+		iNodeEntry *iNodeSource;
+
+		getInodeEntry(iNodeNumberSource, iNodeSource);
+  	getInodeEntry(iNodeNumberTarget, iNodeTarget);
+
+	}
 }
 
 int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
