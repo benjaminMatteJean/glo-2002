@@ -179,6 +179,7 @@ int takeFreeBlock() {
   data[numBlock] = 0;
   printf("GLOFS: Saisie bloc %d\n",numBlock);
   WriteBlock(FREE_BLOCK_BITMAP, data);
+  printf("%d\n",bd_countfreeblocks());
   return numBlock;
 }
 
@@ -207,7 +208,7 @@ int takeFreeInode(){
 
   data[numInode] = 0;
   printf("GLOFS: Saisie de l'i-node %d\n",numInode);
-  WriteBlock(FREE_BLOCK_BITMAP, data);
+  WriteBlock(FREE_INODE_BITMAP, data);
   return numInode;
 }
 
@@ -314,7 +315,6 @@ int bd_countfreeblocks(void) {
 int bd_stat(const char *pFilename, gstat *pStat) {
   ino fileInode = getInodeFromPath(pFilename);
   if (fileInode == -1) {
-    printf("fileInode == -1");
     return -1; //N'existe pas.
   }
 
@@ -478,7 +478,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 	}
 	
 	// Si le fichier ne contient aucune donnée, on crée un nouveau bloc.
-	if (fileiNode.iNodeStat.st_blocks == 0) {
+	if (fileiNode.iNodeStat.st_blocks == 0 && fileiNode.iNodeStat.st_size == 0) {
 		int newBlock = takeFreeBlock();
 		if (newBlock == -1)
 			return 0; // Aucun bloc libre disponible.
@@ -703,6 +703,7 @@ int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
 }
 
 int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
+  printf("%d\n", bd_countfreeblocks());
   char destDir[BLOCK_SIZE];
   char newLinkDir[BLOCK_SIZE];
   ino nlIno, fIno = getInodeFromPath(pPathExistant);
