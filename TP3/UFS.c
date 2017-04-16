@@ -480,11 +480,19 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 	if (numbytes > strlen(buffer))
 		numbytes = strlen(buffer);
 
+	if(fileiNode.iNodeStat.st_size == 0 && numbytes > 0 && fileiNode.iNodeStat.st_blocks == 0){
+	  int blNum = takeFreeBlock();
+	  if(blNum == -1) return 0;
+	  fileiNode.Block[0] = blNum;
+	  fileiNode.iNodeStat.st_blocks = 1;
+	}
+	
 	// Les lignes suivantes écrivent les données dans le fichier, aux endroits assignés.
 	char fileData[BLOCK_SIZE];
-  ReadBlock(fileiNode.Block[0], fileData);
-	for (int i = offset; i < (offset + numbytes); i++)
-    fileData[i] = buffer[i];
+	ReadBlock(fileiNode.Block[0], fileData);
+	for (int i = offset; i < (offset + numbytes); i++){
+	  fileData[i] = buffer[i];
+	}
 	WriteBlock(fileiNode.Block[0], fileData);
 
 	// Les lignes suivantes déterminent la nouvelle taille du fichier.
@@ -673,9 +681,51 @@ int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
 }
 
 int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
-    return -1;
+  char destDir[BLOCK_SIZE];
+  char newLinkDir[BLOCK_SIZE];
+  ino nlIno, fIno = getInodeFromPath(pPathExistant);
+  iNodeEntry newLinkIno;
+
+  if(GetDirFromPath(pPathNouveauLien, destDir) == 0){
+    return -1; //Répertoire inexistant.
+  }
+
+  if(GetFilenameFromPath(pPathNouveauLien, newLinkDir) ==0){
+    return -1; //Fichier inexistant
+  }
+
+  nlIno = getInodeFromPath(pPathNouveauLien);
+  if(getInodeEntry(nlIno, &newLinkIno) == 0) {
+    return -2; //Existe déjà
+  }
+
+  //ça passe, on peut créer le fichier
+  bd_create(pPathNouveauLien);
+  nlIno = getInodeFromPath(pPathNouveauLien);
+  if(getInodeEntry(nlIno, &newLinkIno) != 0){
+    return -1; //Si plus de place
+  }
+
+  newLinkIno.iNodeStat.st_mode |= G_IFLNK | G_IFREG;
+  writeInode(&newLinkIno);
+  bd_write(pPathNouveauLien, pPathExistant, 0, strlen(pPathExistant)+1);
+    
+  return 0;
 }
 
 int bd_readlink(const char *pPathLien, char *pBuffer, int sizeBuffer) {
-    return -1;
+  ino nIno = getInodeFromPath(pPathLien);
+  iNodeEntry pIE;
+
+  if(nIno == -1) return -1;
+  if(getInodeEntry(nIno, &pIE) != 0) return -1; //N'existe pas 
+  if(!(pIE.iNodeStat.st_mode & G_IFREG) || !(pIE.iNodeStat.st_mode & G_IFLNK)) return -1;// N'est pas un lien symbolique
+
+  char data[BLOCK_SIZE];
+  ReadBlock(pIE.Block[0], data);
+  int i;
+  for(i=0; i < pIE.iNodeStat.st_size && i < sizeBuffer; i++){
+    pBuffer[i] = data[i];
+  }
+  return i;
 }
