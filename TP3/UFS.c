@@ -179,7 +179,6 @@ int takeFreeBlock() {
   data[numBlock] = 0;
   printf("GLOFS: Saisie bloc %d\n",numBlock);
   WriteBlock(FREE_BLOCK_BITMAP, data);
-  printf("%d\n",bd_countfreeblocks());
   return numBlock;
 }
 
@@ -207,7 +206,7 @@ int takeFreeInode(){
   }
 
   data[numInode] = 0;
-  printf("GLOFS: Saisie de l'i-node %d\n",numInode);
+  printf("GLOFS: Saisie i-node %d\n",numInode);
   WriteBlock(FREE_INODE_BITMAP, data);
   return numInode;
 }
@@ -217,7 +216,7 @@ int releaseFreeInode(int inoNum) {
   char data[BLOCK_SIZE];
   ReadBlock(FREE_INODE_BITMAP, data);
   data[inoNum] = 1;
-  printf("GLOFS: relache l'inode %d\n", inoNum);
+  printf("GLOFS: Relache i-node %d\n", inoNum);
   WriteBlock(FREE_INODE_BITMAP, data);
   return 1;
 }
@@ -733,7 +732,6 @@ int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
 }
 
 int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
-  printf("%d\n", bd_countfreeblocks());
   char destDir[BLOCK_SIZE];
   char newLinkDir[BLOCK_SIZE];
   ino nlIno, fIno = getInodeFromPath(pPathExistant);
