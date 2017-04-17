@@ -101,43 +101,39 @@ void printiNode(iNodeEntry iNode) {
 
 /*Retourne le numéro d'un bloc libre, -1 sinon. */
 int takeBlock() {
-  char freeBlockBitmap[BLOCK_SIZE];
-  ReadBlock(FREE_BLOCK_BITMAP, freeBlockBitmap);
-
-  int free = -1;
-  for (int i = 6; i < N_BLOCK_ON_DISK; i++) {
-    if(freeBlockBitmap[i] != 0)
-      free = i;
-  }
-  if (free == -1)
-    return -1; //Aucun bloque libre!
+  char freeBlocks[BLOCK_SIZE];
+  ReadBlock(FREE_BLOCK_BITMAP, freeBlocks);
+  int free = 6;
   
-  // On indique que le bloc free est maintenant saisi
-  freeBlockBitmap[free] = 0;
-  printf("GLOFS: Saisie bloc %d\n", free);
-  WriteBlock(FREE_BLOCK_BITMAP, freeBlockBitmap);
+  while(freeBlocks[free] == 0 && free < N_BLOCK_ON_DISK) {
+    free++;
+  }
+  if(free >= N_BLOCK_ON_DISK) {
+    return -1;
+  }
 
+  freeBlocks[free] = 0;
+  printf("GLOFS: Saisie bloc %d\n",free);
+  WriteBlock(FREE_BLOCK_BITMAP, freeBlocks);
   return free;
 }
 
 /*Retourne le numéro d'un inode libre.*/
 int takeiNode(){
-  char freeiNodesBitmap[BLOCK_SIZE];
-  ReadBlock(FREE_INODE_BITMAP, freeiNodesBitmap);
-
-  int free = -1;
-  for (int i = 0; i < N_INODE_ON_DISK; i++) {
-    if(freeiNodesBitmap[i] != 0)
-      free = i;
+  char freeiNodes[BLOCK_SIZE];
+  ReadBlock(FREE_INODE_BITMAP, freeiNodes);
+  int free = ROOT_INODE;
+  
+  while(freeiNodes[free] == 0 && free < N_INODE_ON_DISK) {
+    free++;
   }
-  if (free == -1)
-    return -1; //Aucun i-node libre
+  if(free >= N_BLOCK_ON_DISK) {
+    return -1;
+  }
 
-  // On indique que l'iNode free est maintenant saisi
-  freeiNodesBitmap[free] = 0;
-  printf("GLOFS: Saisie i-node %d\n", free);
-  WriteBlock(FREE_INODE_BITMAP, freeiNodesBitmap);
-
+  freeiNodes[free] = 0;
+  printf("GLOFS: Saisie i-node %d\n",free);
+  WriteBlock(FREE_INODE_BITMAP, freeiNodes);
   return free;
 }
 
@@ -742,7 +738,7 @@ int bd_rename(const char *source, const char *target) {
 
 		if(GetDirFromPath(source, sourceDirectory) == 0)
 			return -1;
-
+		
 		if(GetDirFromPath(target, targetDirectory) == 0)
 			return -1;
 
@@ -761,29 +757,29 @@ int bd_rename(const char *source, const char *target) {
 		if(targetDirectoryiNodeNumber == -1)
 			return -1;
 
-		if(getInodeEntry(sourceDirectoryiNodeNumber, &sourceDirectoryiNode) != 0)
+		if(getIE(sourceDirectoryiNodeNumber, &sourceDirectoryiNode) != 0)
 			return -1;
 
 		removeDir(&sourceDirectoryiNode, sourceiNodeNumber);
 
-		if(getInodeEntry(sourceDirectoryiNodeNumber, &sourceDirectoryiNode) != 0)
+		if(getIE(sourceDirectoryiNodeNumber, &sourceDirectoryiNode) != 0)
 			return -1;
 
 		sourceDirectoryiNode.iNodeStat.st_nlink--;
 		writeInode(&sourceDirectoryiNode);
 
-		if(getInodeEntry(targetDirectoryiNodeNumber, &targetDirectoryiNode) != 0)
+		if(getIE(targetDirectoryiNodeNumber, &targetDirectoryiNode) != 0)
 			return -1;
 
-		addFileDirInDir(&targetDirectoryiNode,sourceiNodeNumber,targetFilename);
+		addDir(&targetDirectoryiNode, targetFilename, sourceiNodeNumber);
 
-		if(getInodeEntry(targetDirectoryiNodeNumber, &targetDirectoryiNode) != 0)
+		if(getIE(targetDirectoryiNodeNumber, &targetDirectoryiNode) != 0)
 			return -1;
 
 		targetDirectoryiNode.iNodeStat.st_nlink++;
 		writeInode(&targetDirectoryiNode);
 
-		if(getInodeEntry(sourceiNodeNumber, &sourceiNode) !=  0)
+		if(getIE(sourceiNodeNumber, &sourceiNode) !=  0)
 			return -1;
 
 		char blockData[BLOCK_SIZE];
@@ -795,7 +791,6 @@ int bd_rename(const char *source, const char *target) {
 		dirEntries->iNode = targetDirectoryiNodeNumber;
 
 		WriteBlock(blockNumber, blockData);
-
 
 		return 0;
 	}
