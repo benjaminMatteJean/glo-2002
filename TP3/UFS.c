@@ -685,63 +685,86 @@ int bd_rmdir(const char *pFilename) {
   return 0;
 }
 
-int bd_rename(const char *pFilename, const char *pDestFilename) {
-	// Si les répertoires sont identiques, ne rien faire.
-	if(pFilename == pDestFilename)
+int bd_rename(const char *source, const char *target) {
+	
+	// Si c'est le meme fichier, rien a effectuer.
+	if(source == target)
 		return 0;
 
-	int hardlink = bd_hardlink(pFilename, pDestFilename);
+	int hardlink = bd_hardlink(source, target);
 
-	// Si hardlink est réussi, seulement unlink la source.
+	// hardlink reussi, on n'a qu'a unlink la source.
 	if (hardlink == 0)
-		return bd_unlink(pFilename);
+		return bd_unlink(source);
 
-	// Si hardlink échoue, alors pFilename est invalide ou le directory de pDestFilename est invalide.
-	else if (hardlink == -2 || hardlink == -1)
+	// Un des paths n'est pas valide.
+	if (hardlink == -1 || hardlink == -2)
 		return -1;
-	
-	else { // Si la source est un répertoire
+
+	// La source est un repertoire.
+	if (hardlink == -3) {
+		char targetFilename[BLOCK_SIZE];
+		char sourceDirectory[BLOCK_SIZE];
+		char targetDirectory[BLOCK_SIZE];
+
+		ino sourceiNodeNumber = getInodeFromPath(source);
+		if (sourceiNodeNumber == -1) return -1;
+
+		if(GetDirFromPath(source, sourceDirectory) == 0)
+			return -1;
 		
-		char sourceDir[BLOCK_SIZE];
-		char targetDir[BLOCK_SIZE];
-		char targetFilename[FILENAME_SIZE];
+		if(GetDirFromPath(target, targetDirectory) == 0)
+			return -1;
 
-		// On récupere les paths du sourceDirectory, targetDirectory et le filename de la source.
-		GetDirFromPath(pFilename, sourceDir);
-		GetDirFromPath(pDestFilename, targetDir);
-		GetFilenameFromPath(pDestFilename, targetFilename);
+		if(GetFilenameFromPath(target, targetFilename) == 0)
+			return -1;
 
-		// On récupere les numeros d'inode du sourceDirectory, targetDirectory et de la source.
-		ino sourceDirectoryInodeNumber = getInodeFromPath(sourceDir);
-		ino targetDirectoryInodeNumber = getInodeFromPath(targetDir);
-		ino sourceInodeNumber = getInodeFromPath(pFilename);
+		iNodeEntry sourceDirectoryiNode;
+		iNodeEntry targetDirectoryiNode;
+		iNodeEntry sourceiNode;
 
-		iNodeEntry sourceDirectoryInode;
-		iNodeEntry targetDirectoryInode;
-		iNodeEntry sourceInode;
+		ino sourceDirectoryiNodeNumber = getInodeFromPath(sourceDirectory);
+		if(sourceDirectoryiNodeNumber == -1)
+			return -1;
 
-		// On récupere les inodes avec les numeros d'inode précédemment récupérés.
-		getInodeEntry(sourceDirectoryInodeNumber, &sourceDirectoryInode);
-		getInodeEntry(targetDirectoryInodeNumber, &targetDirectoryInode);
-		getInodeEntry(sourceInodeNumber, &sourceInode);
+		ino targetDirectoryiNodeNumber = getInodeFromPath(targetDirectory);
+		if(targetDirectoryiNodeNumber == -1)
+			return -1;
 
-		// Si le sourceDir et le targetDir est le meme, on ne fait que rename la source.
-		if (sourceDirectoryInodeNumber == targetDirectoryInodeNumber) {
-			removeDir(&sourceDirectoryInode, sourceInodeNumber);
-			addFileDirInDir(&sourceDirectoryInode, sourceInodeNumber, targetFilename);
-			writeInode(&sourceDirectoryInode);
-			return 0;
-		}
+		if(getInodeEntry(sourceDirectoryiNodeNumber, &sourceDirectoryiNode) != 0)
+			return -1;
 
-		// On commence par retirer les liens de la source à son parent
-		removeDir(&sourceDirectoryInode, sourceInodeNumber);
-		sourceDirectoryInode.iNodeStat.st_nlink--;
-		writeInode(&sourceDirectoryInode);
+		removeDir(&sourceDirectoryiNode, sourceiNodeNumber);
 
-		// On ajoute au targetDir la source, avec le nouveau filename.
-		addFileDirInDir(&targetDirectoryInode, sourceInodeNumber, targetFilename);
-		targetDirectoryInode.iNodeStat.st_nlink++;
-		writeInode(&targetDirectoryInode);
+		if(getInodeEntry(sourceDirectoryiNodeNumber, &sourceDirectoryiNode) != 0)
+			return -1;
+
+		sourceDirectoryiNode.iNodeStat.st_nlink--;
+		writeInode(&sourceDirectoryiNode);
+
+		if(getInodeEntry(targetDirectoryiNodeNumber, &targetDirectoryiNode) != 0)
+			return -1;
+
+		addFileDirInDir(&targetDirectoryiNode,sourceiNodeNumber,targetFilename);
+
+		if(getInodeEntry(targetDirectoryiNodeNumber, &targetDirectoryiNode) != 0)
+			return -1;
+
+		targetDirectoryiNode.iNodeStat.st_nlink++;
+		writeInode(&targetDirectoryiNode);
+
+		if(getInodeEntry(sourceiNodeNumber, &sourceiNode) !=  0)
+			return -1;
+
+		char blockData[BLOCK_SIZE];
+		UINT16 blockNumber = sourceiNode.Block[0];
+		ReadBlock(blockNumber, blockData);
+
+		DirEntry * dirEntries = (DirEntry *) blockData;
+		dirEntries++;
+		dirEntries->iNode = targetDirectoryiNodeNumber;
+
+		WriteBlock(blockNumber, blockData);
 
 		return 0;
 	}

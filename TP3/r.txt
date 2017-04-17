@@ -481,32 +481,32 @@ RetVal:4
 --------------------------------------------------------------------
 
 rename /Bonjour/LesAmis.txt /Bonjour/OncleG.txt 
-RetVal:-1
+RetVal:0
 
 ls /Bonjour 
  drwxrwx              . size:      48 inode:  4 nlink: 2 
  drwxrwx             .. size:     112 inode:  1 nlink: 4 
- -rwxrwx    LesAmis.txt size:       0 inode:  9 nlink: 1 
+ -rwxrwx     OncleG.txt size:       0 inode:  9 nlink: 1 
 RetVal:3
 
 rename /Bonjour/OncleG.txt /DansRoot.txt 
-RetVal:-1
+RetVal:0
 
 ls /Bonjour 
- drwxrwx              . size:      48 inode:  4 nlink: 2 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
- -rwxrwx    LesAmis.txt size:       0 inode:  9 nlink: 1 
-RetVal:3
+ drwxrwx              . size:      32 inode:  4 nlink: 2 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
+RetVal:2
 
 ls / 
- drwxrwx              . size:     112 inode:  1 nlink: 4 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
+ drwxrwx              . size:     128 inode:  1 nlink: 4 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
  drwxrwx            doc size:      48 inode:  2 nlink: 3 
- drwxrwx        Bonjour size:      48 inode:  4 nlink: 2 
+ drwxrwx        Bonjour size:      32 inode:  4 nlink: 2 
  lrwxrwx       slnb.txt size:       7 inode: 10 nlink: 1 
  lrwxrwx   symlinkb.txt size:       7 inode: 11 nlink: 1 
  -rwxrwx       Doge.wow size:       0 inode:  3 nlink: 1 
-RetVal:7
+ -rwxrwx   DansRoot.txt size:       0 inode:  9 nlink: 1 
+RetVal:8
 
 
 --------------------------------------------------------------------
@@ -518,10 +518,9 @@ Nombre de blocs libres: 27
 RetVal:27
 
 ls /Bonjour 
- drwxrwx              . size:      48 inode:  4 nlink: 2 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
- -rwxrwx    LesAmis.txt size:       0 inode:  9 nlink: 1 
-RetVal:3
+ drwxrwx              . size:      32 inode:  4 nlink: 2 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
+RetVal:2
 
 mkdir /Bonjour/newdir 
 GLOFS: Saisie i-node 8
@@ -537,21 +536,21 @@ RetVal:26
 On vérifie que le nombre de lien nlink pour /Bonjour augmente de 1, à cause du sous-répertoire newdir:
 
 ls /Bonjour 
- drwxrwx              . size:      64 inode:  4 nlink: 3 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
- -rwxrwx    LesAmis.txt size:       0 inode:  9 nlink: 1 
+ drwxrwx              . size:      48 inode:  4 nlink: 3 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
  drwxrwx         newdir size:      32 inode:  8 nlink: 2 
-RetVal:4
+RetVal:3
 
 ls / 
- drwxrwx              . size:     112 inode:  1 nlink: 4 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
+ drwxrwx              . size:     128 inode:  1 nlink: 4 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
  drwxrwx            doc size:      48 inode:  2 nlink: 3 
- drwxrwx        Bonjour size:      64 inode:  4 nlink: 3 
+ drwxrwx        Bonjour size:      48 inode:  4 nlink: 3 
  lrwxrwx       slnb.txt size:       7 inode: 10 nlink: 1 
  lrwxrwx   symlinkb.txt size:       7 inode: 11 nlink: 1 
  -rwxrwx       Doge.wow size:       0 inode:  3 nlink: 1 
-RetVal:7
+ -rwxrwx   DansRoot.txt size:       0 inode:  9 nlink: 1 
+RetVal:8
 
 
 --------------------------------------------------------------------
@@ -559,49 +558,53 @@ RetVal:7
 --------------------------------------------------------------------
 
 ls /Bonjour 
- drwxrwx              . size:      64 inode:  4 nlink: 3 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
- -rwxrwx    LesAmis.txt size:       0 inode:  9 nlink: 1 
+ drwxrwx              . size:      48 inode:  4 nlink: 3 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
  drwxrwx         newdir size:      32 inode:  8 nlink: 2 
-RetVal:4
+RetVal:3
 
 ls /doc 
  drwxrwx              . size:      48 inode:  2 nlink: 3 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
  drwxrwx            tmp size:      64 inode:  5 nlink: 3 
 RetVal:3
 
 rename /doc/tmp /Bonjour/tmpmv 
-RetVal:-1
+RetVal:0
 
 On vérifie que le nombre de lien pour /Bonjour augmente de 1 et qu'il diminue de 1 pour /doc:
 
 ls / 
- drwxrwx              . size:     112 inode:  1 nlink: 4 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
- drwxrwx            doc size:      48 inode:  2 nlink: 3 
- drwxrwx        Bonjour size:      64 inode:  4 nlink: 3 
+ drwxrwx              . size:     128 inode:  1 nlink: 4 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
+ drwxrwx            doc size:      32 inode:  2 nlink: 2 
+ drwxrwx        Bonjour size:      64 inode:  4 nlink: 4 
  lrwxrwx       slnb.txt size:       7 inode: 10 nlink: 1 
  lrwxrwx   symlinkb.txt size:       7 inode: 11 nlink: 1 
  -rwxrwx       Doge.wow size:       0 inode:  3 nlink: 1 
-RetVal:7
+ -rwxrwx   DansRoot.txt size:       0 inode:  9 nlink: 1 
+RetVal:8
 
 On vérifie que le sous-réperoire tmpmv contient encore subtmp et new.txt:
 
 ls /Bonjour/tmpmv 
-RetVal:-1
+ drwxrwx              . size:      64 inode:  5 nlink: 3 
+ drwxrwx             .. size:      64 inode:  4 nlink: 4 
+ drwxrwx         subtmp size:      32 inode:  6 nlink: 2 
+ -rwxrwx        new.txt size:       0 inode:  7 nlink: 1 
+RetVal:4
 
 On vérifie que le nombre de lien vers ce même répertoire n'augmente pas si on répète l'opération:
 
 rename /Bonjour/tmpmv /Bonjour/tmpmv2 
-RetVal:-1
+RetVal:0
 
 rename /Bonjour/tmpmv2 /Bonjour/tmpmv3 
-RetVal:-1
+RetVal:0
 
 ls /Bonjour 
- drwxrwx              . size:      64 inode:  4 nlink: 3 
- drwxrwx             .. size:     112 inode:  1 nlink: 4 
- -rwxrwx    LesAmis.txt size:       0 inode:  9 nlink: 1 
+ drwxrwx              . size:      64 inode:  4 nlink: 4 
+ drwxrwx             .. size:     128 inode:  1 nlink: 4 
  drwxrwx         newdir size:      32 inode:  8 nlink: 2 
+ drwxrwx         tmpmv3 size:      64 inode:  5 nlink: 3 
 RetVal:4
