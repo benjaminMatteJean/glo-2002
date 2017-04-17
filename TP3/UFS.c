@@ -237,17 +237,15 @@ void removeDir(iNodeEntry * iNodeDirectory, ino numIno) {
   }
   WriteBlock(blNum, data);
 }
-
 /*Retourne le numéro d'Inode d'un pFilename dans le répertoire spécifié par parentIno.*/
-int getInodeFromParent(const char *pFilename, int parentIno) {
+int getChild(int parentIno, const char *pFilename) {
   char data[BLOCK_SIZE];
   int inoBNum = BASE_BLOCK_INODE;
+  if((parentIno / NUM_INODE_PER_BLOCK) >= 1) //Si le parentIno est plus grand que 16
+    inoBNum++;
   
   if(strcmp(pFilename, "") == 0)
     return parentIno; //Filename vide
- 
-  if((parentIno / NUM_INODE_PER_BLOCK) >= 1) //Si le parentIno est plus grand que 16
-    inoBNum++;
   
   ReadBlock(inoBNum, data);
   iNodeEntry *pINodes = (iNodeEntry *) data;
@@ -255,15 +253,16 @@ int getInodeFromParent(const char *pFilename, int parentIno) {
   int inoPos = parentIno % NUM_INODE_PER_BLOCK;
   //Nombre d'entrées dans le répertoire parent.
   int nEntries = NumberofDirEntry(pINodes[inoPos].iNodeStat.st_size);
-  ReadBlock(pINodes[inoPos].Block[0], data);
-  DirEntry *pDE = (DirEntry *) data;
 
+
+  ReadBlock(pINodes[inoPos].Block[0], data); //Bloque de donnée de l'inode parent
+  DirEntry *pDE = (DirEntry *) data;
   int i;
   for(i=0; i < nEntries; i++) {
     if (strcmp(pFilename, pDE[i].Filename) == 0)
-      return pDE[i].iNode;
+      return pDE[i].iNode; //C'est celui qu'on cherche
   }
-  return -1; //Si le nom de fichier n'existe pas...
+  return -1; //Si le nom de fichier n'existe pas dans le répertoire...
 }
 
 /* Retourne le numéro d'iNode de pFilename par récursion.
@@ -296,11 +295,11 @@ int getInode(const char *pPath, const char *pFilename, int parentIno) {
   pName[i-nbOfSlash] = 0;
   
   if (strcmp(pFilename, pName) == 0){ //Si pName représente le fichier lui même
-    return getInodeFromParent(pName, parentIno);
+    return getChild(parentIno, pName);
   }
-  else {
+  else { //Sinon, c'est un de ses répertoires parent
     //Récursion avec le path racourci, le même nom de fichier et l'inode du répertoire sous-répertoire trouvé par pName.
-    getInode(pPath + strlen(pName) + 1, pFilename, getInodeFromParent(pName, parentIno));
+    getInode(pPath + (strlen(pName) + 1), pFilename, getChild(parentIno, pName));
   } 
 }
 
@@ -345,7 +344,7 @@ int bd_stat(const char *pFilename, gstat *pStat) {
     return -1;
   }
   *pStat = pInodeFile.iNodeStat;
-  return 0; //Succès.
+  return 0; //Succes.
 }
 
 int bd_create(const char *pFilename) {
@@ -366,9 +365,10 @@ int bd_create(const char *pFilename) {
     return -2; //Le fichier existe déjà.
   }
 
-  fileInode = takeiNode();
+  fileInode = takeiNode(); 
   iNodeEntry pInodeFile;
   getIE(fileInode,&pInodeFile);
+  //Setup des stats et écriture sur le disque
   pInodeFile.iNodeStat.st_ino = fileInode;
   pInodeFile.iNodeStat.st_mode = G_IFREG;
   pInodeFile.iNodeStat.st_nlink = 1;
@@ -377,9 +377,10 @@ int bd_create(const char *pFilename) {
   pInodeFile.iNodeStat.st_mode|= G_IRWXU | G_IRWXG; 
   writeInode(&pInodeFile);
 
+  //Ajout d'un répertoire pour le nouveau fichier.
   iNodeEntry pInodeDir;
   getIE(dirInode, &pInodeDir);
-  addDir(&pInodeDir, strFile, fileInode); //Ajout d'un répertoire pour le nouveau fichier.
+  addDir(&pInodeDir, strFile, fileInode); 
   
   return 0; //ça passe
 }
@@ -416,26 +417,31 @@ int bd_mkdir(const char *pDirName) {
   char strSubDir[FILENAME_SIZE];
   char strFilename[FILENAME_SIZE];
   ino subDirIno, dirNameIno;
+  iNodeEntry pInodeSubDir;
   if(GetDirFromPath(pDirName, strSubDir) == 0) {
     return -1; //pDirName ne contient aucun /.
   }
+  
   if(GetFilenameFromPath(pDirName, strFilename) == 0) {
     return -1; //Invalide.
   }
+  
   subDirIno = getInodeFromPath(strSubDir);
   if(subDirIno == -1) {
     return -1; //Le sub directory n'existe pas.
   }
-  dirNameIno = getInodeFromPath(pDirName);
-  if(dirNameIno != -1) {
-    return -2; //Le nouveau directory existe déjà.
-  }
-  iNodeEntry pInodeSubDir;
+  
   if(getIE(subDirIno,&pInodeSubDir)== -1){
     return -1; //Invalide iNodeEntry
   }
+  
   if(pInodeSubDir.iNodeStat.st_mode & G_IFREG) {
-    return -1; //Sub directory n'est pas un répertoire.
+    return -1; //Sub directory n'est pas un répertoire, mais un fichier régulier.
+  }
+  
+  dirNameIno = getInodeFromPath(pDirName);
+  if(dirNameIno != -1) {
+    return -2; //Le nouveau directory existe déjà.
   }
 
   dirNameIno = takeiNode();
@@ -560,6 +566,7 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
 
   char data[BLOCK_SIZE], newLinkName[FILENAME_SIZE];
   GetFilenameFromPath(pPathNouveauLien, newLinkName);
+  
   ReadBlock(newLinkIE.Block[0], data);
   DirEntry *pEntries = (DirEntry *) data;
   int entryNumber = NumberofDirEntry(newLinkIE.iNodeStat.st_size);
@@ -607,7 +614,7 @@ int bd_unlink(const char *pFilename) {
   int entry, offset;
   for(entry = 0; entry < entryNumber; entry++){
     if(strcmp(pDE[entry].Filename, fName) == 0) {
-      if(entry != entryNumber - 1)//S'il n'est pas déjà dernier, on mets à jour la table DirEntry en décalant chacun des élments plus loin
+      if(entry != entryNumber - 1)//S'il n'est pas déjà dernier, on mets à jour la table DirEntry en décalant chacun des éléments stocké plus loin
       {
 	for(offset =1; offset < entryNumber - entry; offset++){
 	  pDE[entry + (offset - 1)] = pDE[entry + offset];
@@ -819,7 +826,7 @@ int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
 
   newLinkIno.iNodeStat.st_mode |= G_IFLNK | G_IFREG;
   writeInode(&newLinkIno);
-  bd_write(pPathNouveauLien, pPathExistant, 0, strlen(pPathExistant)+1);
+  bd_write(pPathNouveauLien, pPathExistant, 0, strlen(pPathExistant)+1); //Écriture du path exisant dans le lien
     
   return 0;
 }
@@ -836,7 +843,7 @@ int bd_readlink(const char *pPathLien, char *pBuffer, int sizeBuffer) {
   ReadBlock(pIE.Block[0], data);
   int i;
   for(i=0; i < pIE.iNodeStat.st_size && i < sizeBuffer; i++){
-    pBuffer[i] = data[i];
+    pBuffer[i] = data[i]; //On stock ce qui est écrit dans le fichier
   }
   return i;
 }
