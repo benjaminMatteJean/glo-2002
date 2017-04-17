@@ -100,45 +100,43 @@ void printiNode(iNodeEntry iNode) {
  */
 
 /*Retourne le numéro d'un bloc libre, -1 sinon. */
-int takeFreeBlock() {
-  char freeBlocks[BLOCK_SIZE];
-  ReadBlock(FREE_BLOCK_BITMAP, freeBlocks);
+int takeBlock() {
+  char freeBlockBitmap[BLOCK_SIZE];
+  ReadBlock(FREE_BLOCK_BITMAP, freeBlockBitmap);
 
   int free = -1;
+  for (int i = 6; i < N_BLOCK_ON_DISK; i++) {
+    if(freeBlockBitmap[i] != 0)
+      free = i;
+  }
+  if (free == -1)
+    return -1; //Aucun bloque libre!
   
-	for (int i = 6; i < N_BLOCK_ON_DISK; i++) {
-		if(freeBlocks[i] != 0)
-			free = i;
-	}
-	if (free == -1)
-		return -1;
-
-	// On indique que le bloc free est maintenant saisi
-  freeBlocks[free] = 0;
+  // On indique que le bloc free est maintenant saisi
+  freeBlockBitmap[free] = 0;
   printf("GLOFS: Saisie bloc %d\n", free);
-  WriteBlock(FREE_BLOCK_BITMAP, freeBlocks);
+  WriteBlock(FREE_BLOCK_BITMAP, freeBlockBitmap);
 
   return free;
 }
 
 /*Retourne le numéro d'un inode libre.*/
-int takeFreeiNode(){
-  char freeiNodes[BLOCK_SIZE];
-  ReadBlock(FREE_INODE_BITMAP, freeiNodes);
+int takeiNode(){
+  char freeiNodesBitmap[BLOCK_SIZE];
+  ReadBlock(FREE_INODE_BITMAP, freeiNodesBitmap);
 
   int free = -1;
-  
   for (int i = 0; i < N_INODE_ON_DISK; i++) {
-		if(freeiNodes[i] != 0)
-			free = i;
-	}
-	if (free == -1)
-		return -1;
+    if(freeiNodesBitmap[i] != 0)
+      free = i;
+  }
+  if (free == -1)
+    return -1; //Aucun i-node libre
 
-	// On indique que l'iNode free est maintenant saisi
-  freeiNodes[free] = 0;
+  // On indique que l'iNode free est maintenant saisi
+  freeiNodesBitmap[free] = 0;
   printf("GLOFS: Saisie i-node %d\n", free);
-  WriteBlock(FREE_INODE_BITMAP, freeiNodes);
+  WriteBlock(FREE_INODE_BITMAP, freeiNodesBitmap);
 
   return free;
 }
@@ -163,96 +161,23 @@ int releaseInode(int inoNum) {
   return 1;
 }
 
-/*Retourne le numéro d'Inode d'un pFilename dans le répertoire spécifié par parentIno.*/
-int getInodeFromParent(const char *pFilename, int parentIno) {
-  if(strcmp(pFilename, "") == 0)
-    return parentIno;
-  char data[BLOCK_SIZE];
-  
-  int inoBNum = BASE_BLOCK_INODE;
-  if((parentIno / NUM_INODE_PER_BLOCK) >= 1)
-    inoBNum++;
-  ReadBlock(inoBNum, data);
-  iNodeEntry *pINodes = (iNodeEntry *) data;
-  //Position de l'inode du parent.
-  UINT16 inoPos = parentIno % NUM_INODE_PER_BLOCK;
-  //Nombre d'entrées dans le répertoire parent.
-  UINT16 nEntries = NumberofDirEntry(pINodes[inoPos].iNodeStat.st_size);
-  ReadBlock(pINodes[inoPos].Block[0], data);
-  DirEntry *pDE = (DirEntry *) data;
-
-  size_t n;
-  for(n=0; n < nEntries; n++) {
-    if (strcmp(pFilename, pDE[n].Filename) == 0)
-      return pDE[n].iNode;
-  }
-  return -1; //Si le nom de fichier n'existe pas...
-}
-
-/* Retourne le numéro d'iNode de pFilename par récursion.
- * @param pPath, le path du fichier/répertoire désiré
- * @param pFilename, le nom du fichier/répertoire
- * @param parentIno, le numéro d'iNode du parent
- */
-int getInode(const char *pPath, const char *pFilename, int parentIno) {
-  if (parentIno == -1) {
-    return -1;
-  }
-  char pName[FILENAME_SIZE];
-  int iChar, iSlash=0;
-  for (iChar =0; iChar < FILENAME_SIZE; iChar++) {
-    if (pPath[iChar] == 0){
-      break;
-    }
-    else if (pPath[iChar] == '/' && iChar != 0){
-      break;
-    }
-    else if (pPath[iChar] == '/'){
-      iSlash++;
-    }
-    else {
-      pName[(iChar-iSlash)] = pPath[iChar];
-    }
-  }
-  pName[iChar - iSlash] = 0;
-  if (strcmp(pFilename, pName) == 0){
-    return getInodeFromParent(pName, parentIno);
-  }
-  else {
-    getInode(pPath + strlen(pName) + 1, pFilename, getInodeFromParent(pName, parentIno));
-  } 
-}
-
-/* Retourne le numéro d'iNode correspondant au path en paramètre.
- * @param pPath, le path du fichier/répertoire désiré
- */
-int getInodeFromPath(const char *pPath){
-  if(pPath == "/")
-    return ROOT_INODE;
-
-  char filename[FILENAME_SIZE];
-
-  if(GetFilenameFromPath(pPath, filename) == 0)
-    filename[0] = 0;
-
-  return getInode(pPath, filename, ROOT_INODE);
-}
-
 /*Retourne le iNodeEntry correspondant au numéro d'inode valide donné. -1 sinon.*/
-int getInodeEntry(int ino, iNodeEntry *pIE) {
+int getIE(int ino, iNodeEntry *pIE) {
+
   if(ino > N_BLOCK_ON_DISK || ino < 0) {
-    return -1;
+    return -1; //Invalide
   }
+  
   char data[BLOCK_SIZE];
   int inoNum = ino;
   int inoBNum = BASE_BLOCK_INODE;
   if((inoNum / NUM_INODE_PER_BLOCK) >= 1)
-    inoBNum++;
+    inoBNum++; //Le numéro d'i-node dépasse 16
 
   ReadBlock(inoBNum, data);
   iNodeEntry *pINodes = (iNodeEntry *) data;
   //Position de l'inode du parent.
-  UINT16 inoPos = inoNum % NUM_INODE_PER_BLOCK;
+  int inoPos = inoNum % NUM_INODE_PER_BLOCK;
   *pIE = pINodes[inoPos];
   return 0;
 }
@@ -262,22 +187,22 @@ void writeInode(iNodeEntry *pIE) {
   char data[BLOCK_SIZE];
   int inoBNum = BASE_BLOCK_INODE;
   if((pIE->iNodeStat.st_ino / NUM_INODE_PER_BLOCK) >= 1)
-    inoBNum++;
+    inoBNum++; //Le numéro d'i-node dépasse 16
 
   ReadBlock(inoBNum, data);
   iNodeEntry *pINodes = (iNodeEntry *) data;
-  UINT16 inoPos = pIE->iNodeStat.st_ino % NUM_INODE_PER_BLOCK;
+  int inoPos = pIE->iNodeStat.st_ino % NUM_INODE_PER_BLOCK;
   pINodes[inoPos] = *pIE;
-  WriteBlock(inoBNum, data);
+  WriteBlock(inoBNum, data); //Écriture sur le disque 
 }
 
 /*Ajoute le directory d'un filename dans un directory existant.*/
-void addFileDirInDir(iNodeEntry * destDir, ino fileIno, char * filename) {
+void addDir(iNodeEntry * destDir, char * filename, ino fileIno) {
   DirEntry *pDirEntry;
   char data[BLOCK_SIZE];
 
-  destDir->iNodeStat.st_size += sizeof(DirEntry);
-  writeInode(destDir);
+  destDir->iNodeStat.st_size += sizeof(DirEntry); //On ajoute un entry
+  writeInode(destDir);//Écriture de l'i-node sur le disque
 
   int nEntries = NumberofDirEntry(destDir->iNodeStat.st_size);
   UINT16 blNum = destDir->Block[0];
@@ -287,7 +212,7 @@ void addFileDirInDir(iNodeEntry * destDir, ino fileIno, char * filename) {
   pDirEntry += (nEntries -1); //Sa place dans le bloc.
   pDirEntry->iNode = fileIno;
   strcpy(pDirEntry->Filename, filename);
-  WriteBlock(blNum, data);
+  WriteBlock(blNum, data);//Écriture du bloque DirEntry sur le disque
 }
 
 /*Enlève du dirEntry l'entry spécifiée par le numIno*/
@@ -313,6 +238,87 @@ void removeDir(iNodeEntry * iNodeDirectory, ino numIno) {
   WriteBlock(blNum, data);
 }
 
+/*Retourne le numéro d'Inode d'un pFilename dans le répertoire spécifié par parentIno.*/
+int getInodeFromParent(const char *pFilename, int parentIno) {
+  char data[BLOCK_SIZE];
+  int inoBNum = BASE_BLOCK_INODE;
+  
+  if(strcmp(pFilename, "") == 0)
+    return parentIno; //Filename vide
+ 
+  if((parentIno / NUM_INODE_PER_BLOCK) >= 1) //Si le parentIno est plus grand que 16
+    inoBNum++;
+  
+  ReadBlock(inoBNum, data);
+  iNodeEntry *pINodes = (iNodeEntry *) data;
+  //Position de l'inode du parent.
+  int inoPos = parentIno % NUM_INODE_PER_BLOCK;
+  //Nombre d'entrées dans le répertoire parent.
+  int nEntries = NumberofDirEntry(pINodes[inoPos].iNodeStat.st_size);
+  ReadBlock(pINodes[inoPos].Block[0], data);
+  DirEntry *pDE = (DirEntry *) data;
+
+  int i;
+  for(i=0; i < nEntries; i++) {
+    if (strcmp(pFilename, pDE[i].Filename) == 0)
+      return pDE[i].iNode;
+  }
+  return -1; //Si le nom de fichier n'existe pas...
+}
+
+/* Retourne le numéro d'iNode de pFilename par récursion.
+ * @param pPath, le path du fichier/répertoire désiré
+ * @param pFilename, le nom du fichier/répertoire
+ * @param parentIno, le numéro d'iNode du parent
+ */
+int getInode(const char *pPath, const char *pFilename, int parentIno) {
+  if (parentIno == -1) {
+    return -1;
+  }
+  char pName[FILENAME_SIZE];
+  int i, nbOfSlash=0;
+  for (i=0; i < FILENAME_SIZE; i++) {
+    if (pPath[i] == 0){
+      break; //Path null
+    }
+    else if (pPath[i] == '/' && i != 0){
+      break; //Lorsqu'on arrive à un sous répertoire
+    }
+    else if (pPath[i] == '/'){
+      nbOfSlash++; //Premier slash du pPath
+    }
+    else {
+      pName[(i-nbOfSlash)] = pPath[i]; 
+    }
+  }
+
+  //Le dernier caractère a null (null-terminated string)
+  pName[i-nbOfSlash] = 0;
+  
+  if (strcmp(pFilename, pName) == 0){ //Si pName représente le fichier lui même
+    return getInodeFromParent(pName, parentIno);
+  }
+  else {
+    //Récursion avec le path racourci, le même nom de fichier et l'inode du répertoire sous-répertoire trouvé par pName.
+    getInode(pPath + strlen(pName) + 1, pFilename, getInodeFromParent(pName, parentIno));
+  } 
+}
+
+/* Retourne le numéro d'iNode correspondant au path en paramètre.
+ * @param pPath, le path du fichier/répertoire désiré
+ */
+int getInodeFromPath(const char *pPath){
+  if(strcmp(pPath, "/") == 0)
+    return ROOT_INODE;
+
+  char filename[FILENAME_SIZE];
+
+  if(GetFilenameFromPath(pPath, filename) == 0)
+    filename[0] = 0;
+  //Appel de la fonction getInode avec directory et filename de passé en paramètre.
+  return getInode(pPath, filename, ROOT_INODE);
+}
+
 /*Fin */
 
 
@@ -335,7 +341,7 @@ int bd_stat(const char *pFilename, gstat *pStat) {
   }
 
   iNodeEntry pInodeFile;
-  if(getInodeEntry(fileInode, &pInodeFile) != 0) {
+  if(getIE(fileInode, &pInodeFile) != 0) {
     return -1;
   }
   *pStat = pInodeFile.iNodeStat;
@@ -360,20 +366,20 @@ int bd_create(const char *pFilename) {
     return -2; //Le fichier existe déjà.
   }
 
-  fileInode = takeFreeiNode();
+  fileInode = takeiNode();
   iNodeEntry pInodeFile;
-  getInodeEntry(fileInode,&pInodeFile);
+  getIE(fileInode,&pInodeFile);
   pInodeFile.iNodeStat.st_ino = fileInode;
   pInodeFile.iNodeStat.st_mode = G_IFREG;
   pInodeFile.iNodeStat.st_nlink = 1;
   pInodeFile.iNodeStat.st_size =0;
   pInodeFile.iNodeStat.st_blocks = 0;
-  pInodeFile.iNodeStat.st_mode |=G_IRWXU | G_IRWXG;
+  pInodeFile.iNodeStat.st_mode|= G_IRWXU | G_IRWXG; 
   writeInode(&pInodeFile);
 
   iNodeEntry pInodeDir;
-  getInodeEntry(dirInode, &pInodeDir);
-  addFileDirInDir(&pInodeDir, fileInode, strFile);
+  getIE(dirInode, &pInodeDir);
+  addDir(&pInodeDir, strFile, fileInode); //Ajout d'un répertoire pour le nouveau fichier.
   
   return 0; //ça passe
 }
@@ -384,7 +390,7 @@ int bd_read(const char *pFilename, char *buffer, int offset, int numbytes) {
     return -1; //Le fichier n'existe pas.
 
   iNodeEntry fileiNode;
-  getInodeEntry(iNodeNumber, &fileiNode);
+  getIE(iNodeNumber, &fileiNode);
 
   if (fileiNode.iNodeStat.st_mode & G_IFDIR)
     return -2; //Ce n'est pas un fichier, mais un répertoire.
@@ -425,46 +431,46 @@ int bd_mkdir(const char *pDirName) {
     return -2; //Le nouveau directory existe déjà.
   }
   iNodeEntry pInodeSubDir;
-  if(getInodeEntry(subDirIno,&pInodeSubDir)== -1){
+  if(getIE(subDirIno,&pInodeSubDir)== -1){
     return -1; //Invalide iNodeEntry
   }
   if(pInodeSubDir.iNodeStat.st_mode & G_IFREG) {
     return -1; //Sub directory n'est pas un répertoire.
   }
 
-  dirNameIno = takeFreeiNode();
+  dirNameIno = takeiNode();
   if(dirNameIno == -1) {
     return -1; //Plein.
   }
-  int blNum  = takeFreeBlock();
+  int blNum  = takeBlock();
   if( blNum == -1){
     return -1; //Plein.
   }
   iNodeEntry pInodeDir;
-  getInodeEntry(dirNameIno,&pInodeDir);
+  getIE(dirNameIno,&pInodeDir);
 
   //incrémente le nb de liens + écrit sur disque et ajoute un directory dans le directory parent.
   pInodeSubDir.iNodeStat.st_nlink++;
   writeInode(&pInodeSubDir);
-  addFileDirInDir(&pInodeSubDir, dirNameIno, strFilename);
+  addDir(&pInodeSubDir, strFilename, dirNameIno);
   //Setup des stats et ajout des repo . et .. sur le bloque.
   pInodeDir.Block[0] = blNum;
   pInodeDir.iNodeStat.st_ino = dirNameIno;
   pInodeDir.iNodeStat.st_mode = G_IFDIR;
   pInodeDir.iNodeStat.st_nlink = 2;
-  pInodeDir.iNodeStat.st_size = sizeof(DirEntry) * 2;
+  pInodeDir.iNodeStat.st_size = sizeof(DirEntry) * 2; //Car il y a . et ..
   pInodeDir.iNodeStat.st_blocks = 1;
   pInodeDir.iNodeStat.st_mode|=G_IRWXU|G_IRWXG;
   writeInode(&pInodeDir);
-  char block[BLOCK_SIZE];
-  ReadBlock(blNum, block);
-  DirEntry *pDir = (DirEntry *) block;
+  char datablock[BLOCK_SIZE];
+  ReadBlock(blNum, datablock);
+  DirEntry *pDir = (DirEntry *) datablock;
   pDir->iNode = dirNameIno;
   strcpy(pDir->Filename, ".");
-  pDir++;
+  pDir++;//Prochain entry
   pDir->iNode = subDirIno;
   strcpy(pDir->Filename, "..");
-  WriteBlock(blNum, block);
+  WriteBlock(blNum, datablock);
   
   return 0;
 }
@@ -475,7 +481,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
     return -1; // Le fichier n'existe pas.
 
   iNodeEntry fileiNode;
-  getInodeEntry(iNodeNumber, &fileiNode);
+  getIE(iNodeNumber, &fileiNode);
 
   if (fileiNode.iNodeStat.st_mode & G_IFDIR)
     return -2; // Ce n'est pas un fichier, mais un répertoire.
@@ -495,7 +501,7 @@ int bd_write(const char *pFilename, const char *buffer, int offset, int numbytes
 	
 	// Si le fichier ne contient aucune donnée, on crée un nouveau bloc.
 	if (fileiNode.iNodeStat.st_blocks == 0 && fileSize == 0) {
-		int newBlock = takeFreeBlock();
+		int newBlock = takeBlock();
 		if (newBlock == -1)
 			return 0; // Aucun bloc libre disponible.
 		fileiNode.Block[0] = newBlock;
@@ -536,11 +542,11 @@ int bd_hardlink(const char *pPathExistant, const char *pPathNouveauLien) {
     return -1; //Un des fichiers est inexistant.
   }
 
-  if(getInodeEntry(existingIno, &existingIE) != 0) {
+  if(getIE(existingIno, &existingIE) != 0) {
     return -1; //pPathExisant n'existe pas.
   }
 
-  if(getInodeEntry(newLinkIno, &newLinkIE) != 0) {
+  if(getIE(newLinkIno, &newLinkIE) != 0) {
     return -1; //pPathNouveauLien n'existe pas.
   }
 
@@ -582,11 +588,11 @@ int bd_unlink(const char *pFilename) {
     return -1; //Fichier ou repertoire non existant.
   }
 
-  if(getInodeEntry(dIno, &dIE) != 0) {
+  if(getIE(dIno, &dIE) != 0) {
     return -1; //Le repertoire n'existe pas.
   }
 
-  if(getInodeEntry(fIno, &fIE) != 0) {
+  if(getIE(fIno, &fIE) != 0) {
     return -1; //Le fichier n'existe pas.
   }
 
@@ -635,7 +641,7 @@ int bd_truncate(const char *pFilename, int NewSize) {
     return -1; // Le fichier n'existe pas.
 
   iNodeEntry fileiNode;
-  if(getInodeEntry(iNodeNumber, &fileiNode) != 0)
+  if(getIE(iNodeNumber, &fileiNode) != 0)
     return -1;
 
   if (fileiNode.iNodeStat.st_mode & G_IFDIR)
@@ -681,11 +687,11 @@ int bd_rmdir(const char *pFilename) {
     return -1; //N'existe pas.
   }
   iNodeEntry pInodeSubDir, pInodeDir;
-  if(getInodeEntry(subDirIno,&pInodeSubDir) == -1){
-    return -1; //Invalide iNodeEntry
+  if(getIE(subDirIno,&pInodeSubDir) == -1){
+    return -1; //Le répertoire parent est non valide
   }
-  if(getInodeEntry(dirNameIno,&pInodeDir) == -1) {
-    return -1; 
+  if(getIE(dirNameIno,&pInodeDir) == -1) {
+    return -1; //Le répertoire est non valide
   }
   if(pInodeDir.iNodeStat.st_mode & G_IFREG) {
     return -2; //Fichier régulier.
@@ -738,14 +744,14 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 		iNodeEntry sourceInode;
 
 		// On récupere les inodes avec les numeros d'inode précédemment récupérés.
-		getInodeEntry(sourceDirectoryInodeNumber, &sourceDirectoryInode);
-		getInodeEntry(targetDirectoryInodeNumber, &targetDirectoryInode);
-		getInodeEntry(sourceInodeNumber, &sourceInode);
+		getIE(sourceDirectoryInodeNumber, &sourceDirectoryInode);
+		getIE(targetDirectoryInodeNumber, &targetDirectoryInode);
+		getIE(sourceInodeNumber, &sourceInode);
 
 		// Si le sourceDir et le targetDir est le meme, on ne fait que rename la source.
 		if (sourceDirectoryInodeNumber == targetDirectoryInodeNumber) {
 			removeDir(&sourceDirectoryInode, sourceInodeNumber);
-			addFileDirInDir(&sourceDirectoryInode, sourceInodeNumber, targetFilename);
+			addDir(&sourceDirectoryInode, targetFilename, sourceInodeNumber);
 			writeInode(&sourceDirectoryInode);
 			return 0;
 		}
@@ -756,7 +762,7 @@ int bd_rename(const char *pFilename, const char *pDestFilename) {
 		writeInode(&sourceDirectoryInode);
 
 		// On ajoute au targetDir la source, avec le nouveau filename.
-		addFileDirInDir(&targetDirectoryInode, sourceInodeNumber, targetFilename);
+		addDir(&targetDirectoryInode, targetFilename, sourceInodeNumber);
 		targetDirectoryInode.iNodeStat.st_nlink++;
 		writeInode(&targetDirectoryInode);
 
@@ -770,7 +776,7 @@ int bd_readdir(const char *pDirLocation, DirEntry **ppListeFichiers) {
     return -1; //Directory inexistant.
 
   iNodeEntry diriNode;
-	getInodeEntry(iNodeNumber, &diriNode);
+	getIE(iNodeNumber, &diriNode);
 
   if (!(diriNode.iNodeStat.st_mode & G_IFDIR))
     return -1; // Le fichier spécifié n'est pas un directory.
@@ -800,14 +806,14 @@ int bd_symlink(const char *pPathExistant, const char *pPathNouveauLien) {
   }
 
   nlIno = getInodeFromPath(pPathNouveauLien);
-  if(getInodeEntry(nlIno, &newLinkIno) == 0) {
+  if(getIE(nlIno, &newLinkIno) == 0) {
     return -2; //Existe déjà
   }
 
   //ça passe, on peut créer le fichier
   bd_create(pPathNouveauLien);
   nlIno = getInodeFromPath(pPathNouveauLien);
-  if(getInodeEntry(nlIno, &newLinkIno) != 0){
+  if(getIE(nlIno, &newLinkIno) != 0){
     return -1; //Si plus de place
   }
 
@@ -823,7 +829,7 @@ int bd_readlink(const char *pPathLien, char *pBuffer, int sizeBuffer) {
   iNodeEntry pIE;
 
   if(nIno == -1) return -1;
-  if(getInodeEntry(nIno, &pIE) != 0) return -1; //N'existe pas 
+  if(getIE(nIno, &pIE) != 0) return -1; //N'existe pas 
   if(!(pIE.iNodeStat.st_mode & G_IFREG) || !(pIE.iNodeStat.st_mode & G_IFLNK)) return -1;// N'est pas un lien symbolique
 
   char data[BLOCK_SIZE];
